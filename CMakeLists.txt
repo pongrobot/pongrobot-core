@@ -43,7 +43,6 @@ include_directories(
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
    scripts/vesc_node.py
-   scripts/vesc_node_oop.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
  )
 
