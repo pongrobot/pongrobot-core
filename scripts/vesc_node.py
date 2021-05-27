@@ -2,6 +2,7 @@ import rospy
 from std_msgs.msg import Float64
 from std_msgs.msg import Bool
 from enum import Enum
+import math
 import serial
 import pyvesc
 
@@ -16,6 +17,7 @@ class VescHandler:
         # ROS data
         self.duty_cycle_sub = rospy.Subscriber("duty_cycle", Float64, self.duty_cycle_callback)
         self.rpm_sub = rospy.Subscriber("rpm", Float64, self.rpm_callback)
+        self.vel_sub = rospy.Subscriber("velocity", Float64, self.vel_callback)
         self.trigger_sub = rospy.Subscriber("trigger", Bool, self.trigger_callback)
         self.ready_pub = rospy.Publisher("vesc_ready", Bool, queue_size=10)
         self.rate = rospy.Rate(10) 
@@ -34,7 +36,8 @@ class VescHandler:
 
         # Motor data
         self.ramp_time = 3 # time it takes for vesc to get up to speed (sec)
-        self.cooldown_time = 10 # time to wait after trigger to shut down motor (sec)
+        self.cooldown_time = 5 # time to wait after trigger to shut down motor (sec)
+        self.wheel_radius = 0.3 # radius of launcher wheel in meters
         self.at_setpoint = False
         self.cooling_down = False
         self.trigger_time = rospy.get_rostime()
@@ -44,17 +47,25 @@ class VescHandler:
         self.command_mode = CommandMode.DUTY_CYCLE_COMMAND
         self.last_command_time = rospy.get_rostime() 
         self.cooling_down = False # un-schedule cooldown condition
-        rospy.loginfo('Received DUTY_CYCLE_COMMAND: ' + str(self.duty_cycle))
+        rospy.loginfo('Received DUTY_CYCLE_COMMAND: ' + str(self.duty_cycle) + '%')
 
     def rpm_callback(self, msg):
         self.rpm = msg.data 
         self.command_mode = CommandMode.RPM_COMMAND
         self.last_command_time = rospy.get_rostime() 
         self.cooling_down = False # un-schedule cooldown condition
-        rospy.loginfo('Received RPM_COMMAND: ' + str(self.rpm))
+        rospy.loginfo('Received RPM_COMMAND: ' + str(self.rpm) + ' rpm')
+
+    def vel_callback(self, msg):
+        self.rpm = self.velocity_to_rpm(msg.data)
+        self.command_mode = CommandMode.RPM_COMMAND
+        self.last_command_time = rospy.get_rostime() 
+        self.cooling_down = False # un-schedule cooldown condition
+        rospy.loginfo('Received VELOCITY_COMMAND: ' + str(msg.data) + ' m/s')
 
     def trigger_callback(self, msg):
-        self.cooling_down = True
+        if self.command_mode != CommandMode.NO_COMMAND:
+            self.cooling_down = True
         self.trigger_time = rospy.get_rostime() 
         self.last_command_time = rospy.get_rostime() # extend command timeout
         rospy.loginfo('Recieved trigger signal, starting cooldown timer')
@@ -68,14 +79,21 @@ class VescHandler:
             self.port_open = False
 
     def send_duty_cycle_command(self):
+        # TODO: Apply acceleration curve
         if self.port_open:
             rospy.loginfo('Sending DUTY_CYCLE_COMMAND = ' + str(self.duty_cycle))
             self.port.write( pyvesc.encode( pyvesc.SetDutyCycle( int((self.duty_cycle) * 1000) )) )
 
     def send_rpm_command(self):
+        # TODO: Apply acceleration curve
         if self.port_open:
             rospy.loginfo('Sending RPM_COMMAND = ' + str(self.rpm))
-            port.write( pyvesc.encode( pyvesc.SetRPM( int(self.rpm * 7)) ) )
+            self.port.write( pyvesc.encode( pyvesc.SetRPM( int(self.rpm * 7)) ) )
+
+    def velocity_to_rpm(self, v):
+        # TODO: Calibrate experimentally and add a calibration function
+        rpm = v * 30.0/(self.wheel_radius * math.pi)
+        return rpm 
 
     def run(self):
         while not rospy.is_shutdown():
