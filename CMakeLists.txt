@@ -36,7 +36,7 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-# include
+  include
   ${catkin_INCLUDE_DIRS}
 )
 ## Mark executable scripts (Python etc.) for installation
@@ -46,5 +46,6 @@ catkin_install_python(PROGRAMS
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
  )
 
-add_executable( trajectory_manager_node src/trajectory_manager_node.cpp )
+# executables
+add_executable( trajectory_manager_node src/trajectory_manager_node.cpp src/TrajectoryManager.cpp)
 target_link_libraries( trajectory_manager_node ${catkin_LIBRARIES} )

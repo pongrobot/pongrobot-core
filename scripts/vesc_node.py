@@ -1,6 +1,7 @@
 import rospy
-from std_msgs.msg import Float64
+from std_msgs.msg import Float32
 from std_msgs.msg import Bool
+from std_msgs.msg import Empty
 from enum import Enum
 import math
 import serial
@@ -15,10 +16,10 @@ class VescHandler:
 
     def __init__(self, port_name, timeout=10, rate=10):
         # ROS data
-        self.duty_cycle_sub = rospy.Subscriber("duty_cycle", Float64, self.duty_cycle_callback)
-        self.rpm_sub = rospy.Subscriber("rpm", Float64, self.rpm_callback)
-        self.vel_sub = rospy.Subscriber("velocity", Float64, self.vel_callback)
-        self.trigger_sub = rospy.Subscriber("trigger", Bool, self.trigger_callback)
+        self.duty_cycle_sub = rospy.Subscriber("duty_cycle_cmd", Float32, self.duty_cycle_callback)
+        self.rpm_sub = rospy.Subscriber("rpm_cmd", Float32, self.rpm_callback)
+        self.vel_sub = rospy.Subscriber("velocity_cmd", Float32, self.vel_callback)
+        self.trigger_sub = rospy.Subscriber("trigger", Empty, self.trigger_callback)
         self.ready_pub = rospy.Publisher("vesc_ready", Bool, queue_size=10)
         self.rate = rospy.Rate(10) 
 
