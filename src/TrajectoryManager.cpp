@@ -20,7 +20,7 @@ TrajectoryManager( ros::NodeHandle nh ):
     abort_sub_ = nh_.subscribe<std_msgs::Empty>("abort", 1, &TrajectoryManager::abortCallback, this);
 
     // setup publishers
-    vesc_cmd_pub_= nh.advertise<std_msgs::Float64>("velocity_cmd", 1);
+    vesc_cmd_pub_= nh.advertise<std_msgs::Float32>("velocity_cmd", 1);
     yaw_cmd_pub_= nh.advertise<std_msgs::Int8>("yaw_cmd", 1);
     trigger_pub_= nh.advertise<std_msgs::Empty>("trigger", 1);
     shot_pub_ = nh.advertise<geometry_msgs::PoseStamped>("shot",1);
@@ -73,7 +73,7 @@ TrajectoryManager::
 calculateYawAngle(const geometry_msgs::PoseStamped::ConstPtr& target_pose )
 {
     // TODO: fill in actual yaw calculation
-    return 10.f;
+    return -40.f;
 }
 
 float
@@ -158,7 +158,7 @@ run()
             }
 
             // Send yaw command
-            std_msgs::Float32 yaw_cmd;
+            std_msgs::Int8 yaw_cmd;
             yaw_cmd.data = (int) target_yaw_;
             yaw_cmd_pub_.publish(yaw_cmd);
 

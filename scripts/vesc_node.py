@@ -21,7 +21,7 @@ class VescHandler:
         self.vel_sub = rospy.Subscriber("velocity_cmd", Float32, self.vel_callback)
         self.trigger_sub = rospy.Subscriber("trigger", Empty, self.trigger_callback)
         self.ready_pub = rospy.Publisher("vesc_ready", Bool, queue_size=10)
-        self.rate = rospy.Rate(10) 
+        self.rate = rospy.Rate(20) 
 
         # Port data
         self.port1_name = port1_name
@@ -33,7 +33,6 @@ class VescHandler:
 
         # Command Data
         self.duty_cycle = 0
-        self.rpm = 0
         self.command_mode = CommandMode.NO_COMMAND
         self.last_command_time = rospy.get_rostime()
         self.command_timeout = timeout
@@ -46,25 +45,36 @@ class VescHandler:
         self.cooling_down = False
         self.trigger_time = rospy.get_rostime()
 
+        # RPM interface
+        self.target_rpm = 0
+        self.rpm_cmd = 0
+        self.initial_rpm = 0
+        self.RPM_ACCEL = 200.0 #rpm/sec
+
     def duty_cycle_callback(self, msg):
         self.duty_cycle = msg.data
         self.command_mode = CommandMode.DUTY_CYCLE_COMMAND
         self.last_command_time = rospy.get_rostime() 
         self.cooling_down = False # un-schedule cooldown condition
+        self.target_rpm = 0
         rospy.loginfo('Received DUTY_CYCLE_COMMAND: ' + str(self.duty_cycle) + '%')
 
     def rpm_callback(self, msg):
-        self.rpm = msg.data 
+        self.target_rpm = msg.data 
+        self.initial_rpm = self.rpm_cmd
         self.command_mode = CommandMode.RPM_COMMAND
         self.last_command_time = rospy.get_rostime() 
         self.cooling_down = False # un-schedule cooldown condition
-        rospy.loginfo('Received RPM_COMMAND: ' + str(self.rpm) + ' rpm')
+        self.duty_cycle = 0
+        rospy.loginfo('Received RPM_COMMAND: ' + str(self.target_rpm) + ' rpm')
 
     def vel_callback(self, msg):
-        self.rpm = self.velocity_to_rpm(msg.data)
+        self.target_rpm = self.velocity_to_rpm(msg.data)
+        self.initial_rpm = self.rpm_cmd
         self.command_mode = CommandMode.RPM_COMMAND
         self.last_command_time = rospy.get_rostime() 
         self.cooling_down = False # un-schedule cooldown condition
+        self.duty_cycle = 0
         rospy.loginfo('Received VELOCITY_COMMAND: ' + str(msg.data) + ' m/s')
 
     def trigger_callback(self, msg):
@@ -100,9 +110,14 @@ class VescHandler:
     def send_rpm_command(self):
         # TODO: Apply acceleration curve
         if self.port1_open and self.port2_open:
-            rospy.loginfo('Sending RPM_COMMAND = ' + str(self.rpm))
-            self.port1.write( pyvesc.encode( pyvesc.SetRPM( int(self.rpm * 7)) ) )
-            self.port2.write( pyvesc.encode( pyvesc.SetRPM( int(self.rpm * 7)) ) )
+            if self.rpm_cmd < self.target_rpm:
+                self.rpm_cmd = self.initial_rpm + (rospy.get_rostime() - self.last_command_time).to_sec() * self.RPM_ACCEL
+            else:
+                self.rpm_cmd = self.target_rpm
+
+            rospy.loginfo('Sending RPM_COMMAND = ' + str(self.rpm_cmd))
+            self.port1.write( pyvesc.encode( pyvesc.SetRPM( int(self.rpm_cmd * 7)) ) )
+            self.port2.write( pyvesc.encode( pyvesc.SetRPM( int(self.rpm_cmd * 7)) ) )
 
     def velocity_to_rpm(self, v):
         # TODO: Calibrate experimentally and add a calibration function
@@ -124,16 +139,20 @@ class VescHandler:
                     # Command has timed out, shut down motor
                     self.at_setpoint = False
                     self.command_mode = CommandMode.NO_COMMAND
+                    self.target_rpm = 0
+                    self.rpm_cmd = 0
 
                 elif self.cooling_down and (rospy.get_rostime() - self.trigger_time).to_sec() > self.cooldown_time:
                     # ball has been launched, shut down motor
                     self.cooling_down = False
                     self.at_setpoint = False
                     self.command_mode = CommandMode.NO_COMMAND
+                    self.target_rpm = 0
+                    self.rpm_cmd = 0
                     rospy.loginfo('Cooled down after trigger')
 
                 else:
-                    self.at_setpoint = (rospy.get_rostime() - self.last_command_time).to_sec() > self.ramp_time
+                    self.at_setpoint = (rospy.get_rostime() - self.last_command_time).to_sec() > self.ramp_time and ( self.target_rpm == self.rpm_cmd )
                     if self.command_mode == CommandMode.DUTY_CYCLE_COMMAND:
                         self.send_duty_cycle_command()
                     elif self.command_mode == CommandMode.RPM_COMMAND:
