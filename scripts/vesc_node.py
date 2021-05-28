@@ -14,7 +14,7 @@ class CommandMode(Enum):
 
 class VescHandler:
 
-    def __init__(self, port_name, timeout=10, rate=10):
+    def __init__(self, port1_name, port2_name, timeout=10, rate=10):
         # ROS data
         self.duty_cycle_sub = rospy.Subscriber("duty_cycle_cmd", Float32, self.duty_cycle_callback)
         self.rpm_sub = rospy.Subscriber("rpm_cmd", Float32, self.rpm_callback)
@@ -24,9 +24,12 @@ class VescHandler:
         self.rate = rospy.Rate(10) 
 
         # Port data
-        self.port_name = port_name
-        self.port_open = False
-        self.open_port()
+        self.port1_name = port1_name
+        self.port2_name = port2_name
+        self.port1_open = False
+        self.port2_open = False
+        self.open_port1()
+        self.open_port2()
 
         # Command Data
         self.duty_cycle = 0
@@ -71,25 +74,35 @@ class VescHandler:
         self.last_command_time = rospy.get_rostime() # extend command timeout
         rospy.loginfo('Recieved trigger signal, starting cooldown timer')
 
-    def open_port(self):
+    def open_port1(self):
         try:
-            self.port = serial.Serial(self.port_name)
-            self.port_open = True
+            self.port1 = serial.Serial(self.port1_name)
+            self.port1_open = True
         except:
-            rospy.logerr('Unable to open port:' + self.port_name) 
-            self.port_open = False
+            rospy.logerr('Unable to open port1:' + self.port1_name) 
+            self.port1_open = False
+
+    def open_port2(self):
+        try:
+            self.port2 = serial.Serial(self.port2_name)
+            self.port2_open = True
+        except:
+            rospy.logerr('Unable to open port2:' + self.port2_name) 
+            self.port2_open = False
 
     def send_duty_cycle_command(self):
         # TODO: Apply acceleration curve
-        if self.port_open:
+        if self.port1_open and self.port2_open:
             rospy.loginfo('Sending DUTY_CYCLE_COMMAND = ' + str(self.duty_cycle))
-            self.port.write( pyvesc.encode( pyvesc.SetDutyCycle( int((self.duty_cycle) * 1000) )) )
+            self.port1.write( pyvesc.encode( pyvesc.SetDutyCycle( int((self.duty_cycle) * 1000) )) )
+            self.port2.write( pyvesc.encode( pyvesc.SetDutyCycle( int((self.duty_cycle) * 1000) )) )
 
     def send_rpm_command(self):
         # TODO: Apply acceleration curve
-        if self.port_open:
+        if self.port1_open and self.port2_open:
             rospy.loginfo('Sending RPM_COMMAND = ' + str(self.rpm))
-            self.port.write( pyvesc.encode( pyvesc.SetRPM( int(self.rpm * 7)) ) )
+            self.port1.write( pyvesc.encode( pyvesc.SetRPM( int(self.rpm * 7)) ) )
+            self.port2.write( pyvesc.encode( pyvesc.SetRPM( int(self.rpm * 7)) ) )
 
     def velocity_to_rpm(self, v):
         # TODO: Calibrate experimentally and add a calibration function
@@ -99,8 +112,11 @@ class VescHandler:
     def run(self):
         while not rospy.is_shutdown():
             # If the serial port is not open, attempt to reconnect
-            if ~self.port_open:
-                self.open_port()
+            if ~self.port1_open:
+                self.open_port1()
+
+            if ~self.port2_open:
+                self.open_port2()
 
             # Check if we have a valid command
             if self.command_mode != CommandMode.NO_COMMAND:
@@ -129,6 +145,6 @@ class VescHandler:
 
 if __name__ =='__main__':
     rospy.init_node('number_counter')
-    vesc_handler = VescHandler('/dev/ttyACM0', 30)
+    vesc_handler = VescHandler('/dev/ttyACM0', '/dev/ttyACM1', 30)
     vesc_handler.run()
     
