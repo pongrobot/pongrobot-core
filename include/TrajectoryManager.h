@@ -3,6 +3,7 @@
 
 #include "ros/ros.h"
 #include <time.h>
+#include <math.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <std_msgs/Bool.h>
 #include <std_msgs/Empty.h>
@@ -23,7 +24,7 @@ class TrajectoryManager
 {
     public:
         TrajectoryManager( ros::NodeHandle nh );
-        void run ();
+        void run();
 
     private:
         // ROS data
@@ -65,6 +66,10 @@ class TrajectoryManager
         float calculateInitialVelocity( const geometry_msgs::PoseStamped::ConstPtr& target_pose);
         bool handleAbortSignal();
         bool handleNewCommand();
+
+        // Constants and launcher parameters
+        double launch_angle_deg_;
+        double const G = 9.81;
 };
 
 #endif
