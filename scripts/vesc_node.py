@@ -32,7 +32,6 @@ class VescHandler:
         self.open_port2()
 
         # Command Data
-        self.duty_cycle = 0
         self.command_mode = CommandMode.NO_COMMAND
         self.last_command_time = rospy.get_rostime()
         self.command_timeout = timeout
@@ -49,10 +48,17 @@ class VescHandler:
         self.target_rpm = 0
         self.rpm_cmd = 0
         self.initial_rpm = 0
-        self.RPM_ACCEL = 200.0 #rpm/sec
+        self.RPM_ACCEL = 200.0 # rpm/sec
+
+        # Duty cycle interface
+        self.target_duty_cycle = 0
+        self.duty_cycle_cmd = 0
+        self.initial_duty_cycle = 0
+        self.DUTY_CYCLE_ACCEL = 5.0 # %/sec
 
     def duty_cycle_callback(self, msg):
-        self.duty_cycle = msg.data
+        self.target_duty_cycle = msg.data
+        self.initial_duty_cycle = self.duty_cycle_cmd
         self.command_mode = CommandMode.DUTY_CYCLE_COMMAND
         self.last_command_time = rospy.get_rostime() 
         self.cooling_down = False # un-schedule cooldown condition
@@ -101,14 +107,19 @@ class VescHandler:
             self.port2_open = False
 
     def send_duty_cycle_command(self):
-        # TODO: Apply acceleration curve
+        # TODO: Apply decceleration curve
         if self.port1_open and self.port2_open:
+            if self.duty_cycle_cmd < self.target_duty_cycle:
+                self.duty_cycle_cmd = self.initial_duty_cycle + (rospy.get_rostime() - self.last_command_time).to_sec() * self.DUTY_CYCLE_ACCEL
+            else:
+                self.duty_cycle_cmd = self.target_duty_cycle
+
             rospy.loginfo('Sending DUTY_CYCLE_COMMAND = ' + str(self.duty_cycle))
-            self.port1.write( pyvesc.encode( pyvesc.SetDutyCycle( int((self.duty_cycle) * 1000) )) )
-            self.port2.write( pyvesc.encode( pyvesc.SetDutyCycle( int((self.duty_cycle) * 1000) )) )
+            self.port1.write( pyvesc.encode( pyvesc.SetDutyCycle( int((self.duty_cycle_cmd) * 1000) )) )
+            self.port2.write( pyvesc.encode( pyvesc.SetDutyCycle( int((self.duty_cycle_cmd) * 1000) )) )
 
     def send_rpm_command(self):
-        # TODO: Apply acceleration curve
+        # TODO: Apply decceleration curve
         if self.port1_open and self.port2_open:
             if self.rpm_cmd < self.target_rpm:
                 self.rpm_cmd = self.initial_rpm + (rospy.get_rostime() - self.last_command_time).to_sec() * self.RPM_ACCEL

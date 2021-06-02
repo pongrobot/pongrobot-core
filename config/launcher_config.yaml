@@ -1,0 +1,20 @@
+# Trajectory manager config data
+traj_manager_loop_rate: 20.0 # rate to run the TrajectoryManager node (hz)
+launch_angle: 35.0 # fixed angle of the launcher (deg)
+max_yaw_angle: 85.0 # max allowable yaw angle command (deg)
+min_yaw_angle:-85.0 # min allowable yaw angle command (deg)
+max_initial_velocity: 1000 # max allowable velocity command (m/s)
+enable_trajectory_plotting: true # enable plotting rviz markers of the planned trajectory
+enable_target_plotting: true # enable plotting an rviz marker for the target pose
+
+# VESC/Motor data
+vesc_loop_rate: 20 # loop rate for the vesc node (hz)
+vesc_port_1: /dev/ttyACM0 # port name for VESC 1
+vesc_port_2: /dev/ttyACM1 # port name for VESC 2
+wheel_radius: 0.3 # radius of the launcher wheel in m
+num_poles: 14 # number of motor poles
+rpm_accel: 200.0 # rpm acceleration limit in rpm/sec
+duty_cycle_accel: 2.0 # duty cycle acceleration limit in %/sec
+ramp_time: 3.0 # maximum time it take for the vesc to reach a commanded value (sec)
+cooldown_time: 5.0 # time after a trigger command has been send before the vescs turn off (sec)
+command_timeout: 30.0  # max time a command will stay active waiting for a trigger signal (sec)
