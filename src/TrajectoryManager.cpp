@@ -7,12 +7,21 @@ TrajectoryManager( ros::NodeHandle nh ):
     yaw_ready_(false),
     state_(StateEnum::IDLE),
     trigger_time_(ros::Time::now()),
-    cmd_sent_time_(ros::Time::now()),
-    cooldown_time_(10),
-    cmd_timeout_(30),
-    launch_angle_deg_(35)
+    cmd_sent_time_(ros::Time::now())
 {
     nh_ = nh;
+    
+    // Pull down params
+    nh_.param<double>("launch_angle",launch_angle_deg_, 35.0);
+    nh_.param<double>("max_yaw_angle", max_yaw_angle_,  85.f);
+    nh_.param<double>("min_yaw_angle", min_yaw_angle_, -85.f);
+    nh_.param<double>("max_initial_velocity", max_initial_velocity_, 1000);
+    double cmd_timeout_sec; 
+    nh_.param<double>("command_timeout",cmd_timeout_sec, 30.f);
+    cmd_timeout_ =  ros::Duration(cmd_timeout_sec);
+    double cooldown_time_sec; 
+    nh_.param<double>("cooldown_time",cooldown_time_sec, 3.f); 
+    cooldown_time_ =  ros::Duration(cooldown_time_sec);
 
     // setup subscribers
     trajectory_pose_sub_ = nh_.subscribe<geometry_msgs::PoseStamped>("trajectory_pose", 1, &TrajectoryManager::trajectoryPoseCallback, this);
@@ -43,8 +52,8 @@ trajectoryPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
         target_velocity_ = calculateInitialVelocity(msg);
 
         // Check bounds
-        bool yaw_in_range = -85 < target_yaw_ && target_yaw_ < 85;
-        bool v_in_range = target_velocity_ >= 0 && target_velocity_ < 10000;
+        bool yaw_in_range = min_yaw_angle_ < target_yaw_ && target_yaw_ < max_yaw_angle_;
+        bool v_in_range = target_velocity_ >= 0 && target_velocity_ < max_initial_velocity_;
 
         if ( yaw_in_range && v_in_range )
         {
@@ -96,10 +105,10 @@ TrajectoryManager::
 calculateYawAngle(const geometry_msgs::PoseStamped::ConstPtr& target_pose )
 {
     // Calculate the yaw angle needed to hit the cup at a given pose
-    double yaw = atan(target_pose->pose.position.y/target_pose->pose.position.x) * 180/M_PI;
+    double yaw = atan2(target_pose->pose.position.y,target_pose->pose.position.x) * 180/M_PI;
 
     // TODO: Connect calculation
-    return -40.f;
+    return yaw;
 }
 
 float
@@ -116,7 +125,7 @@ calculateInitialVelocity(const geometry_msgs::PoseStamped::ConstPtr& target_pose
     double launch_v = d / ( cos(theta) * contact_time );
 
     // TODO: Connect calcualtion
-    return 30.f;
+    return launch_v;
 }
 
 bool

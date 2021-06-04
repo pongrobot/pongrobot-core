@@ -38,7 +38,7 @@ class VescHandler:
 
         # Motor data
         self.ramp_time = rospy.get_param("ramp_time", 3.0) # time it takes for vesc to get up to speed (sec)
-        self.cooldown_time = rospy.get_param("cooldown_time", 5.0) # time to wait after trigger to shut down motor (sec)
+        self.cooldown_time = rospy.get_param("cooldown_time", 3.0) # time to wait after trigger to shut down motor (sec)
         self.wheel_radius = rospy.get_param("wheel_radius", 0.3) # radius of launcher wheel in meters
         self.num_motor_poles = rospy.get_param("num_motor_poles", 14)
         self.at_setpoint = False

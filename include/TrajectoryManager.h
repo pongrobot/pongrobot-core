@@ -69,6 +69,9 @@ class TrajectoryManager
 
         // Constants and launcher parameters
         double launch_angle_deg_;
+        double max_yaw_angle_;
+        double min_yaw_angle_;
+        double max_initial_velocity_;
         double const G = 9.81;
 };
 
