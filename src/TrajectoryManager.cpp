@@ -16,6 +16,8 @@ TrajectoryManager( ros::NodeHandle nh ):
     nh_.param<double>("max_yaw_angle", max_yaw_angle_,  85.f);
     nh_.param<double>("min_yaw_angle", min_yaw_angle_, -85.f);
     nh_.param<double>("max_initial_velocity", max_initial_velocity_, 1000);
+    nh_.param<bool>("plot_traj", plot_traj_ , true);
+    nh_.param<bool>("plot_target", plot_target_ , true);
     double cmd_timeout_sec; 
     nh_.param<double>("command_timeout",cmd_timeout_sec, 30.f);
     cmd_timeout_ =  ros::Duration(cmd_timeout_sec);
@@ -24,7 +26,7 @@ TrajectoryManager( ros::NodeHandle nh ):
     cooldown_time_ =  ros::Duration(cooldown_time_sec);
 
     // setup subscribers
-    trajectory_pose_sub_ = nh_.subscribe<geometry_msgs::PoseStamped>("trajectory_pose", 1, &TrajectoryManager::trajectoryPoseCallback, this);
+    trajectory_pose_sub_ = nh_.subscribe<geometry_msgs::PoseStamped>("target_pose", 1, &TrajectoryManager::trajectoryPoseCallback, this);
     vesc_ready_sub_ = nh_.subscribe<std_msgs::Bool>("vesc_ready", 1, &TrajectoryManager::vescReadyCallback, this);
     yaw_ready_sub_ = nh_.subscribe<std_msgs::Bool>("yaw_ready", 1, &TrajectoryManager::yawReadyCallback, this);
     abort_sub_ = nh_.subscribe<std_msgs::Empty>("abort", 1, &TrajectoryManager::abortCallback, this);
@@ -35,6 +37,16 @@ TrajectoryManager( ros::NodeHandle nh ):
     trigger_pub_= nh.advertise<std_msgs::Empty>("trigger", 1);
     shot_pub_ = nh.advertise<geometry_msgs::PoseStamped>("shot",1);
     state_pub_ = nh.advertise<std_msgs::Int8>("trajectory_manager_state",1);
+
+    // initialize visualization
+    if (plot_target_)
+    {
+        target_pub_ = nh.advertise<visualization_msgs::Marker>("launcher_target",1);
+    }
+    if (plot_traj_)
+    {
+        trajectory_pub_ = nh.advertise<visualization_msgs::Marker>("trajectory",1);
+    }
 }
 
 void
@@ -59,10 +71,21 @@ trajectoryPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
         {
             has_target_ = true;
             abort_ = false; // overwrite abort signal if present
+
+            if (plot_target_)
+            {
+                // Generate rviz marker for target
+                target_pub_.publish(buildTargetMarker());
+            }
+            if (plot_traj_)
+            {
+                trajectory_pub_.publish(buildTrajectoryMarker());
+            }
+
         }
         else
         {
-            has_target_ = true;
+            has_target_ = false;
 
             if (!yaw_in_range)
             {
@@ -75,7 +98,6 @@ trajectoryPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
             }
         }
     }
-
 }
 
 void
@@ -128,6 +150,7 @@ calculateInitialVelocity(const geometry_msgs::PoseStamped::ConstPtr& target_pose
     return launch_v;
 }
 
+
 bool
 TrajectoryManager::
 handleAbortSignal()
@@ -162,6 +185,54 @@ handleNewCommand()
     }
 
     return status;
+}
+
+visualization_msgs::Marker
+TrajectoryManager::
+buildTargetMarker()
+{
+    visualization_msgs::Marker target_marker;
+    target_marker.header.frame_id = target_pose_.header.frame_id;
+    target_marker.header.stamp = ros::Time();
+    target_marker.ns = "launcher_target";
+    target_marker.id = 0;
+    target_marker.type = visualization_msgs::Marker::CYLINDER;
+    target_marker.action = visualization_msgs::Marker::ADD;
+    target_marker.pose = target_pose_.pose;
+    target_marker.scale.x = 0.1;
+    target_marker.scale.y = 0.1;
+    target_marker.scale.z = 0.1;
+    target_marker.color.a = 1.0;
+    target_marker.color.r = 1.0;
+    target_marker.color.g = 0.0;
+    target_marker.color.b = 0.0;
+
+    return target_marker;
+}
+
+visualization_msgs::Marker
+TrajectoryManager::
+buildTrajectoryMarker()
+{
+    visualization_msgs::Marker trajectory_marker;
+    trajectory_marker.header.frame_id = target_pose_.header.frame_id;
+    trajectory_marker.header.stamp = ros::Time();
+    trajectory_marker.ns = "launcher_traj";
+    trajectory_marker.id = 0;
+    trajectory_marker.type = visualization_msgs::Marker::LINE_STRIP;
+    trajectory_marker.action = visualization_msgs::Marker::ADD;
+    trajectory_marker.pose.orientation = target_pose_.pose.orientation; // TODO: make identity quaternion
+    trajectory_marker.scale.x = 0.1;
+    trajectory_marker.scale.y = 0.1;
+    trajectory_marker.scale.z = 0.1;
+    trajectory_marker.color.a = 1.0;
+    trajectory_marker.color.r = 1.0;
+    trajectory_marker.color.g = 0.0;
+    trajectory_marker.color.b = 0.0;
+
+    // TODO: build trajectory
+
+    return trajectory_marker;
 }
 
 void

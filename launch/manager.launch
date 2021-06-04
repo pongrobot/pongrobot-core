@@ -1,0 +1,8 @@
+<launch>
+    <group ns="launcher">
+        <rosparam file="$(find pongrobot_core)/config/launcher_config.yaml" />
+
+        <node name="trajectory_manager_node" pkg="pongrobot_core" type="trajectory_manager_node" output="screen" />
+    </group>
+</launch>
+

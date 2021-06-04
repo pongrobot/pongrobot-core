@@ -5,6 +5,7 @@
 #include <time.h>
 #include <math.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <visualization_msgs/Marker.h>
 #include <std_msgs/Bool.h>
 #include <std_msgs/Empty.h>
 #include <std_msgs/Float64.h>
@@ -38,6 +39,8 @@ class TrajectoryManager
         ros::Publisher trigger_pub_;
         ros::Publisher shot_pub_;
         ros::Publisher state_pub_;
+        ros::Publisher target_pub_;
+        ros::Publisher trajectory_pub_;
 
         // Msg data
         geometry_msgs::PoseStamped target_pose_; 
@@ -55,17 +58,25 @@ class TrajectoryManager
         ros::Time cmd_sent_time_;
         ros::Duration cmd_timeout_;
 
+        // Visualization data
+        bool plot_target_;
+        bool plot_traj_;
+
         // Callbacks
         void trajectoryPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
         void vescReadyCallback(const std_msgs::Bool::ConstPtr& msg);
         void yawReadyCallback(const std_msgs::Bool::ConstPtr& msg);
         void abortCallback(const std_msgs::Empty::ConstPtr& msg);
+        bool handleAbortSignal();
+        bool handleNewCommand();
         
         // Calculation utilities
         float calculateYawAngle( const geometry_msgs::PoseStamped::ConstPtr& target_pose);
         float calculateInitialVelocity( const geometry_msgs::PoseStamped::ConstPtr& target_pose);
-        bool handleAbortSignal();
-        bool handleNewCommand();
+
+        // Visualization tools
+        visualization_msgs::Marker buildTargetMarker();
+        visualization_msgs::Marker buildTrajectoryMarker();
 
         // Constants and launcher parameters
         double launch_angle_deg_;
