@@ -11,8 +11,8 @@ plot_target: true # enable plotting an rviz marker for the target pose
 vesc_loop_rate: 20 # loop rate for the vesc node (hz)
 vesc_port_1: /dev/ttyACM0 # port name for VESC 1
 vesc_port_2: /dev/ttyACM1 # port name for VESC 2
-wheel_radius: 0.3 # radius of the launcher wheel in m
-num_poles: 14 # number of motor poles
+wheel_radius: 0.03 # radius of the launcher wheel in m
+num_poles: 7 # number of motor poles
 rpm_accel: 300.0 # rpm acceleration limit in rpm/sec
 duty_cycle_accel: 2.0 # duty cycle acceleration limit in %/sec
 ramp_time: 3.0 # maximum time it take for the vesc to reach a commanded value (sec)

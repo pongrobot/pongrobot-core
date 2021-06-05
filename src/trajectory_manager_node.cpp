@@ -6,7 +6,11 @@ int main(int argc, char **argv)
     // ROS setup
     ros::init(argc, argv, "trajectory_manager_node");
     ros::NodeHandle nh;
-    ros::Rate loop_rate(20);
+
+    // Setup loop rate
+    double loop_frq;
+    nh.param<double>("traj_manager_loop_rate", loop_frq, 20.0);
+    ros::Rate loop_rate(loop_frq);
 
     TrajectoryManager trajectoryManager(nh);
 
