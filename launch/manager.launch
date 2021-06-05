@@ -1,8 +1,8 @@
 <launch>
     <group ns="launcher">
-        <rosparam file="$(find pongrobot_core)/config/launcher_config.yaml" />
-        <node name="trajectory_manager_node" pkg="pongrobot_core" type="trajectory_manager_node" output="screen" />
-        <node type="rviz" name="rviz" pkg="rviz" args="-d $(find pongrobot_core)/rviz/trajectory_visualizer.rviz" />
+        <rosparam file="$(find pongrobot_actuation)/config/launcher_config.yaml" />
+        <node name="trajectory_manager_node" pkg="pongrobot_actuation" type="trajectory_manager_node" output="screen" />
+        <node type="rviz" name="rviz" pkg="rviz" args="-d $(find pongrobot_actuation)/rviz/trajectory_visualizer.rviz" />
     </group>
 </launch>
 
