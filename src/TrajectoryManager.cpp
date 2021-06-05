@@ -18,6 +18,8 @@ TrajectoryManager( ros::NodeHandle nh ):
     nh_.param<double>("max_initial_velocity", max_initial_velocity_, 1000);
     nh_.param<bool>("plot_traj", plot_traj_ , true);
     nh_.param<bool>("plot_target", plot_target_ , true);
+
+    // Initialize duration params
     double cmd_timeout_sec; 
     nh_.param<double>("command_timeout",cmd_timeout_sec, 30.f);
     cmd_timeout_ =  ros::Duration(cmd_timeout_sec);
@@ -25,20 +27,20 @@ TrajectoryManager( ros::NodeHandle nh ):
     nh_.param<double>("cooldown_time",cooldown_time_sec, 3.f); 
     cooldown_time_ =  ros::Duration(cooldown_time_sec);
 
-    // setup subscribers
+    // Setup subscribers
     trajectory_pose_sub_ = nh_.subscribe<geometry_msgs::PoseStamped>("target_pose", 1, &TrajectoryManager::trajectoryPoseCallback, this);
     vesc_ready_sub_ = nh_.subscribe<std_msgs::Bool>("vesc_ready", 1, &TrajectoryManager::vescReadyCallback, this);
     yaw_ready_sub_ = nh_.subscribe<std_msgs::Bool>("yaw_ready", 1, &TrajectoryManager::yawReadyCallback, this);
     abort_sub_ = nh_.subscribe<std_msgs::Empty>("abort", 1, &TrajectoryManager::abortCallback, this);
 
-    // setup publishers
+    // Setup publishers
     vesc_cmd_pub_= nh.advertise<std_msgs::Float32>("velocity_cmd", 1);
     yaw_cmd_pub_= nh.advertise<std_msgs::Int8>("yaw_cmd", 1);
     trigger_pub_= nh.advertise<std_msgs::Empty>("trigger", 1);
     shot_pub_ = nh.advertise<geometry_msgs::PoseStamped>("shot",1);
     state_pub_ = nh.advertise<std_msgs::Int8>("trajectory_manager_state",1);
 
-    // initialize visualization
+    // Initialize visualization
     if (plot_target_)
     {
         target_pub_ = nh.advertise<visualization_msgs::Marker>("launcher_target",1);
@@ -74,7 +76,6 @@ trajectoryPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
 
             if (plot_target_)
             {
-                // Generate rviz marker for target
                 target_pub_.publish(buildTargetMarker());
             }
             if (plot_traj_)
@@ -85,6 +86,7 @@ trajectoryPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
         }
         else
         {
+            // Reject invalid command and log the issue
             has_target_ = false;
 
             if (!yaw_in_range)
@@ -128,8 +130,6 @@ calculateYawAngle(const geometry_msgs::PoseStamped::ConstPtr& target_pose )
 {
     // Calculate the yaw angle needed to hit the cup at a given pose
     double yaw = atan2(target_pose->pose.position.y,target_pose->pose.position.x) * 180/M_PI;
-
-    // TODO: Connect calculation
     return yaw;
 }
 
@@ -143,13 +143,11 @@ calculateInitialVelocity(const geometry_msgs::PoseStamped::ConstPtr& target_pose
     double theta = launch_angle_deg_ * (M_PI / 180.f);
     
     // Calculate time the ball hits the cup
-    double contact_time = sqrt( ( 2.f * d * tan(theta) - z_c ) / G );
-    double launch_v = d / ( cos(theta) * contact_time );
+    contact_time_ = sqrt( ( 2.f * ( d * tan(theta) - z_c ) ) / G );
+    double launch_v = d / ( cos(theta) * contact_time_ );
 
-    // TODO: Connect calcualtion
     return launch_v;
 }
-
 
 bool
 TrajectoryManager::
@@ -214,6 +212,7 @@ visualization_msgs::Marker
 TrajectoryManager::
 buildTrajectoryMarker()
 {
+    // Create marker
     visualization_msgs::Marker trajectory_marker;
     trajectory_marker.header.frame_id = target_pose_.header.frame_id;
     trajectory_marker.header.stamp = ros::Time();
@@ -226,11 +225,34 @@ buildTrajectoryMarker()
     trajectory_marker.scale.y = 0.1;
     trajectory_marker.scale.z = 0.1;
     trajectory_marker.color.a = 1.0;
-    trajectory_marker.color.r = 1.0;
+    trajectory_marker.color.r = 0.0;
     trajectory_marker.color.g = 0.0;
-    trajectory_marker.color.b = 0.0;
+    trajectory_marker.color.b = 1.0;
 
-    // TODO: build trajectory
+    // Initialize time vector
+    int num_steps = 100;
+    double step_size = (contact_time_)/num_steps; 
+
+    // Cache some important values
+    float r2y = sin(target_yaw_ * M_PI/180.f);
+    float r2x = cos(target_yaw_ * M_PI/180.f);
+    float r_dot = target_velocity_ * cos(launch_angle_deg_ * M_PI/180.f);
+    float z_dot = target_velocity_ * sin(launch_angle_deg_ * M_PI/180.f);
+
+    // Loop over time interval
+    for(int i = 0; i <= num_steps; i++)
+    {
+        // Calculate point along trajectory
+        double t = i * step_size; 
+        float r = r_dot * t; 
+        float z = z_dot * t - (0.5 * G * pow(t,2)); 
+
+        geometry_msgs::Point point;
+        point.x = r * r2x;
+        point.y = r * r2y;
+        point.z = z;
+        trajectory_marker.points.push_back(point);
+    }
 
     return trajectory_marker;
 }

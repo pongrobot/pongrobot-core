@@ -53,6 +53,7 @@ class TrajectoryManager
         StateEnum state_; 
         float target_yaw_;
         float target_velocity_;
+        float contact_time_;
         ros::Time trigger_time_; 
         ros::Duration cooldown_time_;
         ros::Time cmd_sent_time_;
