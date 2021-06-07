@@ -12,7 +12,7 @@ TrajectoryManager( ros::NodeHandle nh ):
     nh_ = nh;
     
     // Pull down params
-    nh_.param<double>("launch_angle",launch_angle_deg_, 35.0);
+    nh_.param<double>("launch_angle",launch_angle_deg_, 30.0);
     nh_.param<double>("max_yaw_angle", max_yaw_angle_,  85.f);
     nh_.param<double>("min_yaw_angle", min_yaw_angle_, -85.f);
     nh_.param<double>("max_initial_velocity", max_initial_velocity_, 1000);
@@ -212,6 +212,9 @@ visualization_msgs::Marker
 TrajectoryManager::
 buildTrajectoryMarker()
 {
+    geometry_msgs::Quaternion identity;
+    identity.w = 1.f;
+
     // Create marker
     visualization_msgs::Marker trajectory_marker;
     trajectory_marker.header.frame_id = target_pose_.header.frame_id;
@@ -220,7 +223,7 @@ buildTrajectoryMarker()
     trajectory_marker.id = 0;
     trajectory_marker.type = visualization_msgs::Marker::LINE_STRIP;
     trajectory_marker.action = visualization_msgs::Marker::ADD;
-    trajectory_marker.pose.orientation = target_pose_.pose.orientation; // TODO: make identity quaternion
+    trajectory_marker.pose.orientation = identity; // TODO: make identity quaternion
     trajectory_marker.scale.x = 0.1;
     trajectory_marker.scale.y = 0.1;
     trajectory_marker.scale.z = 0.1;

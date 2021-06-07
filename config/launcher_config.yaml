@@ -1,6 +1,6 @@
 # Trajectory manager config data
 traj_manager_loop_rate: 20.0 # rate to run the TrajectoryManager node (hz)
-launch_angle: 35.0 # fixed angle of the launcher (deg)
+launch_angle: 30.0 # fixed angle of the launcher (deg)
 max_yaw_angle: 85.0 # max allowable yaw angle command (deg)
 min_yaw_angle: -85.0 # min allowable yaw angle command (deg)
 max_initial_velocity: 1000 # max allowable velocity command (m/s)
