@@ -208,6 +208,9 @@ visualization_msgs::Marker
 TrajectoryManager::
 buildTargetMarker()
 {
+    geometry_msgs::Quaternion identity;
+    identity.w = 1.f;
+
     visualization_msgs::Marker target_marker;
     target_marker.header.frame_id = target_pose_.header.frame_id;
     target_marker.header.stamp = ros::Time();
@@ -216,6 +219,7 @@ buildTargetMarker()
     target_marker.type = visualization_msgs::Marker::CYLINDER;
     target_marker.action = visualization_msgs::Marker::ADD;
     target_marker.pose = target_pose_.pose;
+    target_marker.pose.orientation = identity;
     target_marker.scale.x = 0.1;
     target_marker.scale.y = 0.1;
     target_marker.scale.z = 0.1;
