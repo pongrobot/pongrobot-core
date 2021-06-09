@@ -2,6 +2,8 @@
 
 TrajectoryManager::
 TrajectoryManager( ros::NodeHandle nh ):
+    tf_listener_(tf_buffer_),
+    world_frame_id_("world"),
     has_target_(false),
     vesc_ready_(false),
     yaw_ready_(false),
@@ -137,10 +139,27 @@ float
 TrajectoryManager::
 calculateInitialVelocity(const geometry_msgs::PoseStamped::ConstPtr& target_pose )
 {
+    // Check if transform to world frame is available
+    double launcher_pitch = 0.0;
+    if( tf_buffer_.canTransform( target_pose->header.frame_id, world_frame_id_, ros::Time::now(), ros::Duration(3.0) ) )
+    {
+
+        // Extract the pitch from the transform
+        double roll, pitch, yaw;
+        geometry_msgs::TransformStamped world_2_launcher = tf_buffer_.lookupTransform( target_pose->header.frame_id, world_frame_id_, ros::Time::now(), ros::Duration(0.0) );
+        tf2::Quaternion launcher_orientation;
+        tf2::convert(world_2_launcher.transform.rotation, launcher_orientation);
+        tf2::Matrix3x3 m(launcher_orientation);
+        m.getRPY(roll, pitch, yaw);
+        launcher_pitch = pitch * (180.f / M_PI);
+
+        ROS_INFO("World transform available, launcher pitch: %f", launcher_pitch);
+    }
+
     // Calculate the initial velocity of the ball neglecting drag
     double d = sqrt( pow(target_pose->pose.position.x, 2) + pow(target_pose->pose.position.y, 2) );
     double z_c = target_pose->pose.position.z;
-    double theta = launch_angle_deg_ * (M_PI / 180.f);
+    double theta = (launch_angle_deg_ + launcher_pitch) * (M_PI / 180.f);
     
     // Calculate time the ball hits the cup
     contact_time_ = sqrt( ( 2.f * ( d * tan(theta) - z_c ) ) / G );
