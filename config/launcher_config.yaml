@@ -19,3 +19,5 @@ ramp_time: 3.0 # maximum time it take for the vesc to reach a commanded value (s
 cooldown_time: 3.0 # time after a trigger command has been send before the vescs turn off (sec)
 command_timeout: 30.0  # max time a command will stay active waiting for a trigger signal (sec)
 max_rpm: 2500 # max rpm value for the vesc
+RPM_CAL_M: 0.95339 # RPM calibration slope from regression analysis
+RPM_CAL_B: -0.77448 # RPM calibration offset from regression analysis

@@ -40,7 +40,7 @@ class VescHandler:
         self.ramp_time = rospy.get_param("ramp_time", 3.0) # time it takes for vesc to get up to speed (sec)
         self.cooldown_time = rospy.get_param("cooldown_time", 3.0) # time to wait after trigger to shut down motor (sec)
         self.wheel_radius = rospy.get_param("wheel_radius", 0.03) # radius of launcher wheel in meters
-        self.num_motor_poles = rospy.get_param("num_poles", 14)
+        self.num_motor_poles = rospy.get_param("num_poles", 7)
         self.at_setpoint = False
         self.cooling_down = False
         self.trigger_time = rospy.get_rostime()
@@ -51,6 +51,8 @@ class VescHandler:
         self.initial_rpm = 0
         self.RPM_ACCEL = rospy.get_param("rpm_accel", 200.0) # rpm/sec
         self.MAX_RPM = rospy.get_param("MAX_RPM", 500000)
+        self.RPM_CAL_M = rospy.get_param("RPM_CAL_M", 0.95339)
+        self.RPM_CAL_B = rospy.get_param("RPM_CAL_B", -0.77448)
 
         # Duty cycle interface
         self.target_duty_cycle = 0
@@ -136,10 +138,13 @@ class VescHandler:
                 self.rpm_cmd = self.initial_rpm + (rospy.get_rostime() - self.last_command_time).to_sec() * self.RPM_ACCEL
             else:
                 self.rpm_cmd = self.target_rpm
+            
+            # Apply linear RPM calibration
+            actual_cmd = self.rpm_cmd*self.RPM_CAL_M + self.RPM_CAL_B
 
             rospy.loginfo('Sending RPM_COMMAND = ' + str(self.rpm_cmd))
-            self.port1.write( pyvesc.encode( pyvesc.SetRPM( int(self.rpm_cmd * self.num_motor_poles)) ) )
-            self.port2.write( pyvesc.encode( pyvesc.SetRPM( int(self.rpm_cmd * self.num_motor_poles)) ) )
+            self.port1.write( pyvesc.encode( pyvesc.SetRPM( int(actual_cmd * self.num_motor_poles)) ) )
+            self.port2.write( pyvesc.encode( pyvesc.SetRPM( int(actual_cmd * self.num_motor_poles)) ) )
 
     def velocity_to_rpm(self, v):
         # TODO: Calibrate experimentally and add a calibration function
