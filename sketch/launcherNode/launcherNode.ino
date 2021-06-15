@@ -37,6 +37,9 @@
 #define LAUNCHER_EXTEND_DURATION 500  // Time it takes the launcher servo to extend
 #define LAUNCHER_RETRACT_DURATION 500 // Time it takes the launcher servo to retract
 
+// Ball Detector constants
+#define BALL_DETECTOR_PIN 15
+
 // ---------------------------------------------------
 // GLOBAL VARIABLES
 
@@ -46,6 +49,10 @@ unsigned long lLauncherLastAction = 0;
 bool bWantsLaunch = false;
 bool bHasCommand = false;
 Servo launcherServo; 
+
+// Ball Detector state
+bool bHasBall = false;
+bool bHasBallLatch = false;
 
 // Swivel variables & state
 int iSwivelState = SWIVEL_CALIBRATE_BOUNDS_LOW;
@@ -71,8 +78,8 @@ void triggerCommandCallback(const std_msgs::Empty& launch_msg) {
 void yawCommandCallback(const std_msgs::Int8& yaw_msg) {
   // Yaw message will be a value from -90 to 90 inclusive
   // Convert this to a target position.
-  lSwivelNewTargetPos = constrain(map(yaw_msg.data, -90, 90, 0, lSwivelHighPos),0, lSwivelHighPos);
-  if (lSwivelNewTargetPos != lSwivelTargetPos) {
+  lSwivelNewTargetPos = constrain(map(-yaw_msg.data, -90, 90, 0, lSwivelHighPos),0, lSwivelHighPos);
+  if (lSwivelNewTargetPos != lSwivelTargetPos || bHasCommand == false) {
     lSwivelTargetPos = lSwivelNewTargetPos;
     bYawIsReady = false;
     bHasCommand = true;
@@ -86,8 +93,16 @@ ros::Subscriber<std_msgs::Empty> triggerSubscriber("trigger", &triggerCommandCal
 std_msgs::Bool ready_msg;
 ros::Publisher readyPublisher("yaw_ready", &ready_msg);
 
+std_msgs::Bool ball_msg;
+ros::Publisher ballPublisher("has_ball", &ball_msg);
+
 // ---------------------------------------------------
 // ROS SETUP
+
+void sendBallMsg() {
+  ball_msg.data = bHasBall;
+  ballPublisher.publish(&ball_msg);
+}
 
 void sendReadyMsg() {
   ready_msg.data = bYawIsReady && bHasCommand;
@@ -101,7 +116,7 @@ void setup() {
 
   // Initialize stepper motor
   pinMode(SWIVEL_STEP_ENABLE, OUTPUT);
-  digitalWrite(SWIVEL_STEP_ENABLE, LOW);
+  digitalWrite(SWIVEL_STEP_ENABLE, HIGH);
   
   // Set to use full microstepping
   pinMode(SWIVEL_MICROSTEP_PIN_1, OUTPUT);
@@ -114,6 +129,9 @@ void setup() {
   // Stepper limit switches
   pinMode(SWIVEL_LIMIT_LOW_PIN, INPUT_PULLUP);
   pinMode(SWIVEL_LIMIT_HIGH_PIN, INPUT_PULLUP);
+
+  // Ball detector
+  pinMode(BALL_DETECTOR_PIN, INPUT_PULLUP);
   
   // Set max speed and acceleration for the stepper
   stepper.setSpeed(1500);
@@ -130,6 +148,7 @@ void setup() {
   nh.subscribe(yawSubscriber);
   nh.subscribe(triggerSubscriber);
   nh.advertise(readyPublisher);
+  nh.advertise(ballPublisher);
 
 }
 
@@ -138,12 +157,12 @@ void setup() {
 
 void loop() {
   if (!nh.connected()) {
-    digitalWrite(SWIVEL_STEP_ENABLE, LOW);
+    //digitalWrite(SWIVEL_STEP_ENABLE, LOW);
     nh.spinOnce();
 
     if (nh.connected()) {
-      digitalWrite(SWIVEL_STEP_ENABLE, HIGH);
-      iSwivelState = SWIVEL_CALIBRATE_BOUNDS_LOW;
+      //digitalWrite(SWIVEL_STEP_ENABLE, HIGH);
+      //iSwivelState = SWIVEL_CALIBRATE_BOUNDS_LOW;
       bYawIsReady = false;
       sendReadyMsg();
       nh.spinOnce();
@@ -152,8 +171,12 @@ void loop() {
   }
 
   // Check limit switches
-  bool limitLow = !digitalRead(2);
-  bool limitHigh = !digitalRead(4);
+  bool limitLow = !digitalRead(SWIVEL_LIMIT_LOW_PIN);
+  bool limitHigh = !digitalRead(SWIVEL_LIMIT_HIGH_PIN);
+
+  // Check ball detector
+  // Latch so once it's on, needs to be reset manually
+  bHasBall = !digitalRead(BALL_DETECTOR_PIN) || bHasBallLatch;
 
   switch (iSwivelState) {
     case SWIVEL_IDLE: {
@@ -163,6 +186,12 @@ void loop() {
       } else {
         bYawIsReady = true;
       }
+
+      // Send ball status while we are idle
+      if (bHasBall) {
+        bHasBallLatch = true;
+      }
+      //sendBallMsg();
       sendReadyMsg();
       nh.spinOnce();
       
@@ -187,7 +216,6 @@ void loop() {
       stepper.run();
       if (limitHigh) {
         stepper.stop();
-        iSwivelState = SWIVEL_IDLE;
         lSwivelHighPos = stepper.currentPosition();
         stepper.setCurrentPosition(lSwivelHighPos);
         stepper.run();
@@ -196,6 +224,7 @@ void loop() {
         lSwivelTargetPos = lSwivelHighPos / 2;
         bSwivelClearedEndStop = false;
         
+        iSwivelState = SWIVEL_MOVING;
         bYawIsReady = false;
         sendReadyMsg();
         nh.spinOnce();
@@ -240,6 +269,12 @@ void loop() {
       if (millis() - lLauncherLastAction > LAUNCHER_RETRACT_DURATION) {
         iLauncherState = LAUNCHER_IDLE;
         bWantsLaunch = false;
+
+        // Reset "Has ball" status after we have launched the ball
+        bHasBall = false;
+        bHasBallLatch = false;
+        //sendBallMsg();
+        //nh.spinOnce();
       }
       break;
     }
