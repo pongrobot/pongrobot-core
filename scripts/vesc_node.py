@@ -53,6 +53,7 @@ class VescHandler:
         self.MAX_RPM = rospy.get_param("MAX_RPM", 500000)
         self.RPM_CAL_M = rospy.get_param("RPM_CAL_M", 0.95339)
         self.RPM_CAL_B = rospy.get_param("RPM_CAL_B", -0.77448)
+        self.FUDGE = 1.1 # fudge factor on the RPM, should be driven to 1.0 with propper calibration
 
         # Duty cycle interface
         self.target_duty_cycle = 0
@@ -141,6 +142,7 @@ class VescHandler:
             
             # Apply linear RPM calibration
             actual_cmd = self.rpm_cmd*self.RPM_CAL_M + self.RPM_CAL_B
+            actual_cmd = actual_cmd * self.FUDGE
 
             rospy.loginfo('Sending RPM_COMMAND = ' + str(self.rpm_cmd))
             self.port1.write( pyvesc.encode( pyvesc.SetRPM( int(actual_cmd * self.num_motor_poles)) ) )
