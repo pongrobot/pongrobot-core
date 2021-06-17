@@ -49,7 +49,7 @@ class VescHandler:
         self.target_rpm = 0
         self.rpm_cmd = 0
         self.initial_rpm = 0
-        self.RPM_ACCEL = rospy.get_param("rpm_accel", 200.0) # rpm/sec
+        self.RPM_ACCEL = rospy.get_param("rpm_accel", 800.0) # rpm/sec
         self.MAX_RPM = rospy.get_param("MAX_RPM", 500000)
         self.RPM_CAL_M = rospy.get_param("RPM_CAL_M", 0.95339)
         self.RPM_CAL_B = rospy.get_param("RPM_CAL_B", -0.77448)
@@ -95,14 +95,14 @@ class VescHandler:
         self.last_command_time = rospy.get_rostime() 
         self.cooling_down = False # un-schedule cooldown condition
         self.duty_cycle = 0
-        rospy.loginfo('Received VELOCITY_COMMAND: ' + str(msg.data) + ' m/s')
+        rospy.loginfo('Received VELOCITY_COMMAND: ' + "{:.4f}".format(msg.data) + ' m/s')
 
     def trigger_callback(self, msg):
         if self.command_mode != CommandMode.NO_COMMAND and not self.cooling_down:
             self.cooling_down = True
             self.trigger_time = rospy.get_rostime() 
             self.last_command_time = rospy.get_rostime() # extend command timeout
-            rospy.loginfo('Recieved trigger signal, starting cooldown timer')
+            rospy.logdebug('Recieved trigger signal, starting cooldown timer')
 
     def open_port1(self):
         try:
@@ -128,7 +128,7 @@ class VescHandler:
             else:
                 self.duty_cycle_cmd = self.target_duty_cycle
 
-            rospy.loginfo('Sending DUTY_CYCLE_COMMAND = ' + str(self.duty_cycle_cmd))
+            rospy.logdebug('Sending DUTY_CYCLE_COMMAND = ' + str(self.duty_cycle_cmd))
             self.port1.write( pyvesc.encode( pyvesc.SetDutyCycle( int((self.duty_cycle_cmd) * 1000) )) )
             self.port2.write( pyvesc.encode( pyvesc.SetDutyCycle( int((self.duty_cycle_cmd) * 1000) )) )
 
@@ -144,7 +144,7 @@ class VescHandler:
             actual_cmd = self.rpm_cmd*self.RPM_CAL_M + self.RPM_CAL_B
             actual_cmd = actual_cmd * self.FUDGE
 
-            rospy.loginfo('Sending RPM_COMMAND = ' + str(self.rpm_cmd))
+            rospy.logdebug('Sending RPM_COMMAND = ' + str(self.rpm_cmd))
             self.port1.write( pyvesc.encode( pyvesc.SetRPM( int(actual_cmd * self.num_motor_poles)) ) )
             self.port2.write( pyvesc.encode( pyvesc.SetRPM( int(actual_cmd * self.num_motor_poles)) ) )
 
@@ -183,7 +183,7 @@ class VescHandler:
                     self.command_mode = CommandMode.NO_COMMAND
                     self.target_rpm = 0
                     self.rpm_cmd = 0
-                    rospy.loginfo('Cooled down after trigger')
+                    rospy.logdebug('Cooled down after trigger')
 
                 else:
                     self.at_setpoint = (rospy.get_rostime() - self.last_command_time).to_sec() > self.ramp_time and ( self.target_rpm == self.rpm_cmd )

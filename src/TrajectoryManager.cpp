@@ -153,7 +153,7 @@ calculateInitialVelocity(const geometry_msgs::PoseStamped::ConstPtr& target_pose
         m.getRPY(roll, pitch, yaw);
         launcher_pitch = pitch * (180.f / M_PI);
 
-        ROS_INFO("World transform available, launcher pitch: %f", launcher_pitch);
+        ROS_INFO("[TrajectoryManager] World transform available, launcher pitch: %.4f deg", launcher_pitch);
     }
 
     // Calculate the initial velocity of the ball neglecting drag
@@ -300,7 +300,7 @@ run()
             // Check for new command
             if( handleNewCommand() )
             {
-                ROS_INFO("State Transition: IDLE->HAS_TARGET");
+                ROS_INFO("[TrajectoryManager] IDLE->HAS_TARGET");
             }
             break;
         }
@@ -309,14 +309,14 @@ run()
             // Check for abort signal
             if ( handleAbortSignal() )
             {
-                ROS_INFO("State Transition: HAS_TARGET->ABORT");
+                ROS_INFO("[TrajectoryManager] HAS_TARGET->ABORT");
                 break;
             }
 
             // Check for new command
             if ( handleNewCommand() )
             {
-                ROS_INFO("State Transition: HAS_TARGET->HAS_TARGET");
+                ROS_INFO("[TrajectoryManager] HAS_TARGET->HAS_TARGET");
                 break;
             }
 
@@ -333,7 +333,8 @@ run()
             // Transition to WAIT(commands sent to subsystems)
             cmd_sent_time_ = ros::Time::now();
             state_ = StateEnum::WAIT;
-            ROS_INFO("State Transition: HAS_TARGET->WAIT");
+            ROS_INFO("[TrajectoryManager] Sending Command: YAW=%.4f deg, VELOCITY=%.4f m/s", target_yaw_, target_velocity_);
+            ROS_INFO("[TrajectoryManager] HAS_TARGET->WAIT");
 
             break;
         }
@@ -342,14 +343,14 @@ run()
             // Check for abort signal
             if ( handleAbortSignal() )
             {
-                ROS_INFO("State Transition: WAIT->ABORT");
+                ROS_INFO("[TrajectoryManager] WAIT->ABORT");
                 break;
             }
 
             // Check for new command
             if ( handleNewCommand() )
             {
-                ROS_INFO("State Transition: WAIT->HAS_TARGET");
+                ROS_INFO("[TrajectoryManager] WAIT->HAS_TARGET");
                 break;
             }
 
@@ -358,7 +359,7 @@ run()
             {
                 // Transition to HAS_TARGET
                 state_ = StateEnum::HAS_TARGET;
-                ROS_INFO("State Transition: WAIT->HAS_TARGET");
+                ROS_INFO("[TrajectoryManager] WAIT->HAS_TARGET");
             }
 
             // Check if all subsystems are ready
@@ -369,7 +370,7 @@ run()
                 // Transition to SHOOT
                 trigger_time_ = ros::Time::now();
                 state_ = StateEnum::SHOOT;
-                ROS_INFO("State Transition: WAIT->SHOOT");
+                ROS_INFO("[TrajectoryManager] WAIT->SHOOT");
             }
 
             break;
@@ -384,7 +385,7 @@ run()
 
                 // Transition to IDLE
                 state_ = StateEnum::IDLE;
-                ROS_INFO("State Transition: SHOOT->IDLE");
+                ROS_INFO("[TrajectoryManager] SHOOT->IDLE");
             }
 
             break;
@@ -398,7 +399,7 @@ run()
 
             // Transition to IDLE
             state_ = StateEnum::IDLE;
-            ROS_INFO("State Transition: ABORT->IDLE");
+            ROS_INFO("[TrajectoryManager] ABORT->IDLE");
 
             break;
         }
