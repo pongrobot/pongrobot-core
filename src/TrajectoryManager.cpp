@@ -379,6 +379,9 @@ run()
             // Wait for launcher to cool down
             if ( (ros::Time::now() - trigger_time_) > cooldown_time_ )
             {
+                // Publish shot confirmation
+                shot_pub_.publish(target_pose_);
+
                 // Transition to IDLE
                 state_ = StateEnum::IDLE;
                 ROS_INFO("State Transition: SHOOT->IDLE");
@@ -392,9 +395,6 @@ run()
             std_msgs::Float32 velocity_cmd;
             velocity_cmd.data = 0.f;
             vesc_cmd_pub_.publish(velocity_cmd);
-
-            // Publish shot confirmation
-            shot_pub_.publish(target_pose_);
 
             // Transition to IDLE
             state_ = StateEnum::IDLE;
