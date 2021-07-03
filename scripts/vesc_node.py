@@ -6,6 +6,7 @@ from enum import Enum
 import math
 import serial
 import pyvesc
+import sys
 
 class CommandMode(Enum):
     NO_COMMAND=0
@@ -14,18 +15,19 @@ class CommandMode(Enum):
 
 class VescHandler:
 
-    def __init__(self):
+    def __init__(self, port1, port2):
         # ROS data
         self.duty_cycle_sub = rospy.Subscriber("duty_cycle_cmd", Float32, self.duty_cycle_callback)
         self.rpm_sub = rospy.Subscriber("rpm_cmd", Float32, self.rpm_callback)
         self.vel_sub = rospy.Subscriber("velocity_cmd", Float32, self.vel_callback)
         self.trigger_sub = rospy.Subscriber("trigger", Empty, self.trigger_callback)
         self.ready_pub = rospy.Publisher("vesc_ready", Bool, queue_size=10)
-        self.rate = rospy.Rate( rospy.get_param("vesc_loop_rate", 20) ) 
+
+        self.load_config()
 
         # Port data
-        self.port1_name = rospy.get_param("vesc_port_1", "/dev/ttyACM0")
-        self.port2_name = rospy.get_param("vesc_port_2", "/dev/ttyACM1")
+        self.port1_name = port1
+        self.port2_name = port2
         self.port1_open = False
         self.port2_open = False
         self.open_port1()
@@ -34,13 +36,8 @@ class VescHandler:
         # Command Data
         self.command_mode = CommandMode.NO_COMMAND
         self.last_command_time = rospy.get_rostime()
-        self.command_timeout = rospy.get_param("command_timeout", 30.0)
 
         # Motor data
-        self.ramp_time = rospy.get_param("ramp_time", 3.0) # time it takes for vesc to get up to speed (sec)
-        self.cooldown_time = rospy.get_param("cooldown_time", 3.0) # time to wait after trigger to shut down motor (sec)
-        self.wheel_radius = rospy.get_param("wheel_radius", 0.03) # radius of launcher wheel in meters
-        self.num_motor_poles = rospy.get_param("num_poles", 7)
         self.at_setpoint = False
         self.cooling_down = False
         self.trigger_time = rospy.get_rostime()
@@ -49,17 +46,30 @@ class VescHandler:
         self.target_rpm = 0
         self.rpm_cmd = 0
         self.initial_rpm = 0
-        self.RPM_ACCEL = rospy.get_param("rpm_accel", 800.0) # rpm/sec
-        self.MAX_RPM = rospy.get_param("MAX_RPM", 500000)
-        self.RPM_CAL_M = rospy.get_param("RPM_CAL_M", 0.95339)
-        self.RPM_CAL_B = rospy.get_param("RPM_CAL_B", -0.77448)
         self.FUDGE = 1.1 # fudge factor on the RPM, should be driven to 1.0 with propper calibration
 
         # Duty cycle interface
         self.target_duty_cycle = 0
         self.duty_cycle_cmd = 0
         self.initial_duty_cycle = 0
-        self.DUTY_CYCLE_ACCEL = rospy.get_param("duty_cycle_accel", 2.0) # %/sec
+
+    def load_config(self):
+        # read rate config
+        self.rate = rospy.Rate( rospy.get_param("/rate/vesc", 20) ) 
+    
+        # read geometry config
+        self.wheel_radius = rospy.get_param("geometry/wheel_radius", 0.03) # radius of launcher wheel in meters
+
+        # read vesc config
+        self.num_motor_poles = rospy.get_param("vesc/num_motor_poles", 7)
+        self.RPM_ACCEL = rospy.get_param("vesc/rpm_accel", 800.0) # rpm/sec
+        self.DUTY_CYCLE_ACCEL = rospy.get_param("vesc/duty_cycle_accel", 2.0) # %/sec
+        self.ramp_time = rospy.get_param("vesc/ramp_time", 3.0) # time it takes for vesc to get up to speed (sec)
+        self.cooldown_time = rospy.get_param("vesc/cooldown_time", 3.0) # time to wait after trigger to shut down motor (sec)
+        self.command_timeout = rospy.get_param("vesc/command_timeout", 30.0)
+        self.MAX_RPM = rospy.get_param("vesc/max_rpm", 2500)
+        self.RPM_CAL_M = rospy.get_param("vesc/rpm_calibration_slope", 0.95339)
+        self.RPM_CAL_B = rospy.get_param("vesc/rpm_calibration_offset", -0.77448)
 
     def duty_cycle_callback(self, msg):
         if msg.data > 100:
@@ -133,7 +143,6 @@ class VescHandler:
             self.port2.write( pyvesc.encode( pyvesc.SetDutyCycle( int((self.duty_cycle_cmd) * 1000) )) )
 
     def send_rpm_command(self):
-        # TODO: Apply decceleration curve
         if self.port1_open and self.port2_open:
             if self.rpm_cmd < self.target_rpm:
                 self.rpm_cmd = self.initial_rpm + (rospy.get_rostime() - self.last_command_time).to_sec() * self.RPM_ACCEL
@@ -198,6 +207,12 @@ class VescHandler:
 
 if __name__ =='__main__':
     rospy.init_node('vesc_node')
-    vesc_handler = VescHandler()
-    vesc_handler.run()
+    myargv = rospy.myargv(argv=sys.argv)
+
+    if len(myargv) >= 2:
+        vesc_handler = VescHandler(sys.argv[1], sys.argv[2])
+        vesc_handler.run()
+    else:
+        print("Invalid number of args")
+
     

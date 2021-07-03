@@ -29,6 +29,7 @@ class TrajectoryManager
     public:
         TrajectoryManager( ros::NodeHandle nh );
         void run();
+        void load_params();
 
     private:
         // ROS data

@@ -1,23 +1,25 @@
-# Trajectory manager config data
-traj_manager_loop_rate: 20.0 # rate to run the TrajectoryManager node (hz)
-launch_angle: 30.0 # fixed angle of the launcher (deg)
-max_yaw_angle: 85.0 # max allowable yaw angle command (deg)
-min_yaw_angle: -85.0 # min allowable yaw angle command (deg)
-max_initial_velocity: 1000 # max allowable velocity command (m/s)
-plot_traj: true # enable plotting rviz markers of the planned trajectory
-plot_target: true # enable plotting an rviz marker for the target pose
+# Physical geometry config values
+geometry/launch_angle: 30.0 # fixed angle of the launcher (deg)
+geometry/wheel_radius: 0.03 # radius of the launcher wheel in m
 
-# VESC/Motor data
-vesc_loop_rate: 20 # loop rate for the vesc node (hz)
-vesc_port_1: /dev/ttyACM0 # port name for VESC 1
-vesc_port_2: /dev/ttyACM1 # port name for VESC 2
-wheel_radius: 0.03 # radius of the launcher wheel in m
-num_poles: 7 # number of motor poles
-rpm_accel: 800.0 # rpm acceleration limit in rpm/sec
-duty_cycle_accel: 2.0 # duty cycle acceleration limit in %/sec
-ramp_time: 3.0 # maximum time it take for the vesc to reach a commanded value (sec)
-cooldown_time: 3.0 # time after a trigger command has been send before the vescs turn off (sec)
-command_timeout: 30.0  # max time a command will stay active waiting for a trigger signal (sec)
-max_rpm: 2500 # max rpm value for the vesc
-RPM_CAL_M: 0.95339 # RPM calibration slope from regression analysis
-RPM_CAL_B: -0.77448 # RPM calibration offset from regression analysis
+# Trajectory config limits
+trajectory/min_yaw_angle: -85.0 # min allowable yaw angle command (deg)
+trajectory/max_yaw_angle: 85.0 # max allowable yaw angle command (deg)
+trajectory/max_initial_velocity: 1000 # max allowable velocity command (m/s)
+trajectory/target_frame: world # coordinate frame to use if the transform is available
+
+# Visualization config flags
+visualization/plot_traj: true # enable plotting rviz markers of the planned trajectory
+visualization/plot_target: true # enable plotting an rviz marker for the target pose
+
+# VESC config values
+vesc/num_motor_poles: 7 # number of motor poles
+vesc/rpm_accel: 800.0 # rpm acceleration limit in rpm/sec
+vesc/duty_cycle_accel: 2.0 # duty cycle acceleration limit in %/sec
+vesc/ramp_time: 3.0 # maximum time it take for the vesc to reach a commanded value (sec)
+vesc/cooldown_time: 3.0 # time after a trigger command has been send before the vescs turn off (sec)
+vesc/command_timeout: 30.0  # max time a command will stay active waiting for a trigger signal (sec) 
+vesc/max_rpm: 2500 # max rpm value for the vesc
+vesc/rpm_calibration_slope: 0.95339 # RPM calibration slope from regression analysis
+vesc/rpm_calibration_offset: -0.77448 # RPM calibration offset from regression analysis
+

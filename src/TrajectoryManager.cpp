@@ -3,7 +3,6 @@
 TrajectoryManager::
 TrajectoryManager( ros::NodeHandle nh ):
     tf_listener_(tf_buffer_),
-    world_frame_id_("world"),
     has_target_(false),
     vesc_ready_(false),
     yaw_ready_(false),
@@ -13,13 +12,7 @@ TrajectoryManager( ros::NodeHandle nh ):
 {
     nh_ = nh;
     
-    // Pull down params
-    nh_.param<double>("launch_angle",launch_angle_deg_, 30.0);
-    nh_.param<double>("max_yaw_angle", max_yaw_angle_,  85.f);
-    nh_.param<double>("min_yaw_angle", min_yaw_angle_, -85.f);
-    nh_.param<double>("max_initial_velocity", max_initial_velocity_, 1000);
-    nh_.param<bool>("plot_traj", plot_traj_ , true);
-    nh_.param<bool>("plot_target", plot_target_ , true);
+    load_params();    
 
     // Initialize duration params
     double cmd_timeout_sec; 
@@ -404,5 +397,18 @@ run()
             break;
         }
     }
+}
+
+void
+TrajectoryManager::
+load_params()
+{
+    nh_.param<double>("geometry/launch_angle",launch_angle_deg_, 30.0);
+    nh_.param<double>("trajectory/max_yaw_angle", max_yaw_angle_,  85.f);
+    nh_.param<double>("trajectory/min_yaw_angle", min_yaw_angle_, -85.f);
+    nh_.param<double>("trajectory/max_initial_velocity", max_initial_velocity_, 1000);
+    nh_.param<std::string>("trajectory/target_frame",world_frame_id_, "world");
+    nh_.param<bool>("visualization/plot_traj", plot_traj_ , true);
+    nh_.param<bool>("visualization/plot_target", plot_target_ , true);
 }
 
