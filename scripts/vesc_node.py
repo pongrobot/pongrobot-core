@@ -46,7 +46,7 @@ class VescHandler:
         self.target_rpm = 0
         self.rpm_cmd = 0
         self.initial_rpm = 0
-        self.FUDGE = 1.1 # fudge factor on the RPM, should be driven to 1.0 with propper calibration
+        self.FUDGE = 1.0 # fudge factor on the RPM, should be driven to 1.0 with propper calibration
 
         # Duty cycle interface
         self.target_duty_cycle = 0
