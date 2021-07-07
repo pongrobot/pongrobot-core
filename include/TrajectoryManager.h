@@ -11,6 +11,9 @@
 #include <std_msgs/Float64.h>
 #include <std_msgs/Float32.h>
 #include <std_msgs/Int8.h>
+#include <tf2_ros/buffer_interface.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_ros/transform_listener.h>
 
 enum StateEnum
 {
@@ -26,6 +29,7 @@ class TrajectoryManager
     public:
         TrajectoryManager( ros::NodeHandle nh );
         void run();
+        void load_params();
 
     private:
         // ROS data
@@ -62,6 +66,11 @@ class TrajectoryManager
         // Visualization data
         bool plot_target_;
         bool plot_traj_;
+
+        // TF data
+        std::string world_frame_id_;
+        tf2_ros::Buffer tf_buffer_;
+        tf2_ros::TransformListener tf_listener_;
 
         // Callbacks
         void trajectoryPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);

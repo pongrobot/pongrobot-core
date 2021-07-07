@@ -2,6 +2,7 @@
 
 TrajectoryManager::
 TrajectoryManager( ros::NodeHandle nh ):
+    tf_listener_(tf_buffer_),
     has_target_(false),
     vesc_ready_(false),
     yaw_ready_(false),
@@ -11,13 +12,7 @@ TrajectoryManager( ros::NodeHandle nh ):
 {
     nh_ = nh;
     
-    // Pull down params
-    nh_.param<double>("launch_angle",launch_angle_deg_, 35.0);
-    nh_.param<double>("max_yaw_angle", max_yaw_angle_,  85.f);
-    nh_.param<double>("min_yaw_angle", min_yaw_angle_, -85.f);
-    nh_.param<double>("max_initial_velocity", max_initial_velocity_, 1000);
-    nh_.param<bool>("plot_traj", plot_traj_ , true);
-    nh_.param<bool>("plot_target", plot_target_ , true);
+    load_params();    
 
     // Initialize duration params
     double cmd_timeout_sec; 
@@ -137,10 +132,27 @@ float
 TrajectoryManager::
 calculateInitialVelocity(const geometry_msgs::PoseStamped::ConstPtr& target_pose )
 {
+    // Check if transform to world frame is available
+    double launcher_pitch = 0.0;
+    if( tf_buffer_.canTransform( target_pose->header.frame_id, world_frame_id_, ros::Time::now(), ros::Duration(3.0) ) )
+    {
+
+        // Extract the pitch from the transform
+        double roll, pitch, yaw;
+        geometry_msgs::TransformStamped world_2_launcher = tf_buffer_.lookupTransform( target_pose->header.frame_id, world_frame_id_, ros::Time::now(), ros::Duration(0.0) );
+        tf2::Quaternion launcher_orientation;
+        tf2::convert(world_2_launcher.transform.rotation, launcher_orientation);
+        tf2::Matrix3x3 m(launcher_orientation);
+        m.getRPY(roll, pitch, yaw);
+        launcher_pitch = pitch * (180.f / M_PI);
+
+        ROS_INFO("[TrajectoryManager] World transform available, launcher pitch: %.4f deg", launcher_pitch);
+    }
+
     // Calculate the initial velocity of the ball neglecting drag
     double d = sqrt( pow(target_pose->pose.position.x, 2) + pow(target_pose->pose.position.y, 2) );
     double z_c = target_pose->pose.position.z;
-    double theta = launch_angle_deg_ * (M_PI / 180.f);
+    double theta = (launch_angle_deg_ + launcher_pitch) * (M_PI / 180.f);
     
     // Calculate time the ball hits the cup
     contact_time_ = sqrt( ( 2.f * ( d * tan(theta) - z_c ) ) / G );
@@ -189,6 +201,9 @@ visualization_msgs::Marker
 TrajectoryManager::
 buildTargetMarker()
 {
+    geometry_msgs::Quaternion identity;
+    identity.w = 1.f;
+
     visualization_msgs::Marker target_marker;
     target_marker.header.frame_id = target_pose_.header.frame_id;
     target_marker.header.stamp = ros::Time();
@@ -197,6 +212,7 @@ buildTargetMarker()
     target_marker.type = visualization_msgs::Marker::CYLINDER;
     target_marker.action = visualization_msgs::Marker::ADD;
     target_marker.pose = target_pose_.pose;
+    target_marker.pose.orientation = identity;
     target_marker.scale.x = 0.1;
     target_marker.scale.y = 0.1;
     target_marker.scale.z = 0.1;
@@ -212,6 +228,9 @@ visualization_msgs::Marker
 TrajectoryManager::
 buildTrajectoryMarker()
 {
+    geometry_msgs::Quaternion identity;
+    identity.w = 1.f;
+
     // Create marker
     visualization_msgs::Marker trajectory_marker;
     trajectory_marker.header.frame_id = target_pose_.header.frame_id;
@@ -220,7 +239,7 @@ buildTrajectoryMarker()
     trajectory_marker.id = 0;
     trajectory_marker.type = visualization_msgs::Marker::LINE_STRIP;
     trajectory_marker.action = visualization_msgs::Marker::ADD;
-    trajectory_marker.pose.orientation = target_pose_.pose.orientation; // TODO: make identity quaternion
+    trajectory_marker.pose.orientation = identity; // TODO: make identity quaternion
     trajectory_marker.scale.x = 0.1;
     trajectory_marker.scale.y = 0.1;
     trajectory_marker.scale.z = 0.1;
@@ -274,7 +293,7 @@ run()
             // Check for new command
             if( handleNewCommand() )
             {
-                ROS_INFO("State Transition: IDLE->HAS_TARGET");
+                ROS_INFO("[TrajectoryManager] IDLE->HAS_TARGET");
             }
             break;
         }
@@ -283,14 +302,14 @@ run()
             // Check for abort signal
             if ( handleAbortSignal() )
             {
-                ROS_INFO("State Transition: HAS_TARGET->ABORT");
+                ROS_INFO("[TrajectoryManager] HAS_TARGET->ABORT");
                 break;
             }
 
             // Check for new command
             if ( handleNewCommand() )
             {
-                ROS_INFO("State Transition: HAS_TARGET->HAS_TARGET");
+                ROS_INFO("[TrajectoryManager] HAS_TARGET->HAS_TARGET");
                 break;
             }
 
@@ -307,7 +326,8 @@ run()
             // Transition to WAIT(commands sent to subsystems)
             cmd_sent_time_ = ros::Time::now();
             state_ = StateEnum::WAIT;
-            ROS_INFO("State Transition: HAS_TARGET->WAIT");
+            ROS_INFO("[TrajectoryManager] Sending Command: YAW=%.4f deg, VELOCITY=%.4f m/s", target_yaw_, target_velocity_);
+            ROS_INFO("[TrajectoryManager] HAS_TARGET->WAIT");
 
             break;
         }
@@ -316,14 +336,14 @@ run()
             // Check for abort signal
             if ( handleAbortSignal() )
             {
-                ROS_INFO("State Transition: WAIT->ABORT");
+                ROS_INFO("[TrajectoryManager] WAIT->ABORT");
                 break;
             }
 
             // Check for new command
             if ( handleNewCommand() )
             {
-                ROS_INFO("State Transition: WAIT->HAS_TARGET");
+                ROS_INFO("[TrajectoryManager] WAIT->HAS_TARGET");
                 break;
             }
 
@@ -332,7 +352,7 @@ run()
             {
                 // Transition to HAS_TARGET
                 state_ = StateEnum::HAS_TARGET;
-                ROS_INFO("State Transition: WAIT->HAS_TARGET");
+                ROS_INFO("[TrajectoryManager] WAIT->HAS_TARGET");
             }
 
             // Check if all subsystems are ready
@@ -343,7 +363,7 @@ run()
                 // Transition to SHOOT
                 trigger_time_ = ros::Time::now();
                 state_ = StateEnum::SHOOT;
-                ROS_INFO("State Transition: WAIT->SHOOT");
+                ROS_INFO("[TrajectoryManager] WAIT->SHOOT");
             }
 
             break;
@@ -353,9 +373,12 @@ run()
             // Wait for launcher to cool down
             if ( (ros::Time::now() - trigger_time_) > cooldown_time_ )
             {
+                // Publish shot confirmation
+                shot_pub_.publish(target_pose_);
+
                 // Transition to IDLE
                 state_ = StateEnum::IDLE;
-                ROS_INFO("State Transition: SHOOT->IDLE");
+                ROS_INFO("[TrajectoryManager] SHOOT->IDLE");
             }
 
             break;
@@ -367,15 +390,25 @@ run()
             velocity_cmd.data = 0.f;
             vesc_cmd_pub_.publish(velocity_cmd);
 
-            // Publish shot confirmation
-            shot_pub_.publish(target_pose_);
-
             // Transition to IDLE
             state_ = StateEnum::IDLE;
-            ROS_INFO("State Transition: ABORT->IDLE");
+            ROS_INFO("[TrajectoryManager] ABORT->IDLE");
 
             break;
         }
     }
+}
+
+void
+TrajectoryManager::
+load_params()
+{
+    nh_.param<double>("geometry/launch_angle",launch_angle_deg_, 30.0);
+    nh_.param<double>("trajectory/max_yaw_angle", max_yaw_angle_,  85.f);
+    nh_.param<double>("trajectory/min_yaw_angle", min_yaw_angle_, -85.f);
+    nh_.param<double>("trajectory/max_initial_velocity", max_initial_velocity_, 1000);
+    nh_.param<std::string>("trajectory/target_frame",world_frame_id_, "world");
+    nh_.param<bool>("visualization/plot_traj", plot_traj_ , true);
+    nh_.param<bool>("visualization/plot_target", plot_target_ , true);
 }
 

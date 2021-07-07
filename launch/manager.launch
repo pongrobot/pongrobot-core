@@ -1,4 +1,6 @@
 <launch>
+    <rosparam ns="rate" file="$(find pongrobot_actuation)/config/rate_config.yaml" />
+
     <group ns="launcher">
         <rosparam file="$(find pongrobot_actuation)/config/launcher_config.yaml" />
         <node name="trajectory_manager_node" pkg="pongrobot_actuation" type="trajectory_manager_node" output="screen" />
