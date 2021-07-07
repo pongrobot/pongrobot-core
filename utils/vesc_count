@@ -1,0 +1,4 @@
+#!/bin/zsh
+# Run a python script which will output a count of the number of VESC devices already connected
+# This is used in the udev rule to label any new VESC devices
+python3 vesc_count.py
