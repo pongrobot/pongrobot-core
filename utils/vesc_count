@@ -1,4 +1,12 @@
 #!/bin/zsh
+
+#ls -1q /dev/tty* | wc -l
+
+# Do some magic to get in the right directory by parsing the script's absolute path
+__script="${BASH_SOURCE[0]:-${(%):-%x}}"
+__dir="$( dirname "$__script" )"
+cd $__dir
+
 # Run a python script which will output a count of the number of VESC devices already connected
 # This is used in the udev rule to label any new VESC devices
-python3 vesc_count.py
+python3 vesc_count.py $1
