@@ -46,7 +46,6 @@ class VescHandler:
         self.target_rpm = 0
         self.rpm_cmd = 0
         self.initial_rpm = 0
-        self.FUDGE = 1.0 # fudge factor on the RPM, should be driven to 1.0 with propper calibration
 
         # Duty cycle interface
         self.target_duty_cycle = 0
@@ -55,21 +54,22 @@ class VescHandler:
 
     def load_config(self):
         # read rate config
-        self.rate = rospy.Rate( rospy.get_param("/rate/vesc", 20) ) 
+        self.rate = rospy.Rate( rospy.get_param("/rate/vesc") ) 
     
         # read geometry config
-        self.wheel_radius = rospy.get_param("geometry/wheel_radius", 0.03) # radius of launcher wheel in meters
+        self.wheel_radius = rospy.get_param("geometry/wheel_radius") # radius of launcher wheel in meters
 
         # read vesc config
-        self.num_motor_poles = rospy.get_param("vesc/num_motor_poles", 7)
-        self.RPM_ACCEL = rospy.get_param("vesc/rpm_accel", 800.0) # rpm/sec
-        self.DUTY_CYCLE_ACCEL = rospy.get_param("vesc/duty_cycle_accel", 2.0) # %/sec
-        self.ramp_time = rospy.get_param("vesc/ramp_time", 3.0) # time it takes for vesc to get up to speed (sec)
-        self.cooldown_time = rospy.get_param("vesc/cooldown_time", 3.0) # time to wait after trigger to shut down motor (sec)
-        self.command_timeout = rospy.get_param("vesc/command_timeout", 30.0)
-        self.MAX_RPM = rospy.get_param("vesc/max_rpm", 2500)
-        self.RPM_CAL_M = rospy.get_param("vesc/rpm_calibration_slope", 0.95339)
-        self.RPM_CAL_B = rospy.get_param("vesc/rpm_calibration_offset", -0.77448)
+        self.num_motor_poles = rospy.get_param("vesc/num_motor_poles")
+        self.RPM_ACCEL = rospy.get_param("vesc/rpm_accel") # rpm/sec
+        self.DUTY_CYCLE_ACCEL = rospy.get_param("vesc/duty_cycle_accel") # %/sec
+        self.ramp_time = rospy.get_param("vesc/ramp_time") # time it takes for vesc to get up to speed (sec)
+        self.cooldown_time = rospy.get_param("vesc/cooldown_time") # time to wait after trigger to shut down motor (sec)
+        self.command_timeout = rospy.get_param("vesc/command_timeout")
+        self.MAX_RPM = rospy.get_param("vesc/max_rpm")
+        self.RPM_CAL_M = rospy.get_param("vesc/rpm_calibration_slope")
+        self.RPM_CAL_B = rospy.get_param("vesc/rpm_calibration_offset")
+        self.FUDGE = rospy.get_param("vesc/fudge") 
 
     def duty_cycle_callback(self, msg):
         if msg.data > 100:

@@ -22,4 +22,5 @@ vesc/command_timeout: 30.0  # max time a command will stay active waiting for a 
 vesc/max_rpm: 2500 # max rpm value for the vesc
 vesc/rpm_calibration_slope: 0.95339 # RPM calibration slope from regression analysis
 vesc/rpm_calibration_offset: -0.77448 # RPM calibration offset from regression analysis
+vesc/fudge: 1.0 # fudge factor for motor commands, should be driven to zero with a well calibrated system
 

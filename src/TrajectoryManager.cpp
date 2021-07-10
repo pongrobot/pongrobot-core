@@ -14,13 +14,6 @@ TrajectoryManager( ros::NodeHandle nh ):
     
     load_params();    
 
-    // Initialize duration params
-    double cmd_timeout_sec; 
-    nh_.param<double>("command_timeout",cmd_timeout_sec, 30.f);
-    cmd_timeout_ =  ros::Duration(cmd_timeout_sec);
-    double cooldown_time_sec; 
-    nh_.param<double>("cooldown_time",cooldown_time_sec, 3.f); 
-    cooldown_time_ =  ros::Duration(cooldown_time_sec);
 
     // Setup subscribers
     trajectory_pose_sub_ = nh_.subscribe<geometry_msgs::PoseStamped>("target_pose", 1, &TrajectoryManager::trajectoryPoseCallback, this);
@@ -403,12 +396,54 @@ void
 TrajectoryManager::
 load_params()
 {
-    nh_.param<double>("geometry/launch_angle",launch_angle_deg_, 30.0);
-    nh_.param<double>("trajectory/max_yaw_angle", max_yaw_angle_,  85.f);
-    nh_.param<double>("trajectory/min_yaw_angle", min_yaw_angle_, -85.f);
-    nh_.param<double>("trajectory/max_initial_velocity", max_initial_velocity_, 1000);
-    nh_.param<std::string>("trajectory/target_frame",world_frame_id_, "world");
-    nh_.param<bool>("visualization/plot_traj", plot_traj_ , true);
-    nh_.param<bool>("visualization/plot_target", plot_target_ , true);
+    if ( !nh_.getParam("geometry/launch_angle",launch_angle_deg_) )
+    {
+        ROS_ERROR("TrajectoryManager could not load param: %s/geometry/launch_angle", nh_.getNamespace().c_str());
+    }
+
+    if ( !nh_.getParam("trajectory/max_yaw_angle", max_yaw_angle_) )
+    {
+        ROS_ERROR("TrajectoryManager could not load param: %s/trajectory/max_yaw_angle", nh_.getNamespace().c_str());
+    }
+    
+    if ( !nh_.getParam("trajectory/min_yaw_angle", min_yaw_angle_) )
+    {
+        ROS_ERROR("TrajectoryManager could not load param: %s/trajectory/min_yaw_angle", nh_.getNamespace().c_str());
+    }
+
+    if ( !nh_.getParam("trajectory/max_initial_velocity", max_initial_velocity_) )
+    {
+        ROS_ERROR("TrajectoryManager could not load param: %s/trajectory/max_initial_velocity", nh_.getNamespace().c_str());
+    }
+
+    if ( !nh_.getParam("trajectory/target_frame",world_frame_id_) )
+    {
+        ROS_ERROR("TrajectoryManager could not load param: %s/trajectory/target_frame", nh_.getNamespace().c_str());
+    }
+
+    if ( !nh_.getParam("visualization/plot_traj", plot_traj_) )
+    {
+        ROS_ERROR("TrajectoryManager could not load param: %s/visualization/plot_traj", nh_.getNamespace().c_str());
+    }
+
+    if ( !nh_.getParam("visualization/plot_target", plot_target_) )
+    {
+        ROS_ERROR("TrajectoryManager could not load param: %s/visualization/plot_target", nh_.getNamespace().c_str());
+    }
+
+    double cmd_timeout_sec; 
+    if ( !nh_.getParam("/launcher/vesc/command_timeout", cmd_timeout_sec) )
+    {
+        ROS_ERROR("TrajectoryManager could not load param: /launcher/vesc/command_timeout" );
+    }
+    cmd_timeout_ =  ros::Duration(cmd_timeout_sec);
+
+    double cooldown_time_sec; 
+    if ( !nh_.getParam("/launcher/vesc/cooldown_time",cooldown_time_sec) )
+    {
+        ROS_ERROR("TrajectoryManager could not load param: /launcher/vesc/cooldown_time" );
+    }
+    cooldown_time_ =  ros::Duration(cooldown_time_sec);
+
 }
 

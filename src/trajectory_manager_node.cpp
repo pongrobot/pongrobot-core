@@ -9,7 +9,10 @@ int main(int argc, char **argv)
 
     // Setup loop rate
     double loop_frq;
-    nh.param<double>("/rate/trajectory", loop_frq, 20.0);
+    if ( !nh.getParam("/rate/trajectory", loop_frq) )
+    {
+        ROS_ERROR("TrajectoryManager could not load param: /rate/trajectory" );
+    }
     ros::Rate loop_rate(loop_frq);
 
     TrajectoryManager trajectoryManager(nh);
