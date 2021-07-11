@@ -1,1 +1,1 @@
-SUBSYSTEMS=="usb", KERNEL=="ttyACM[0-9]*", MODE="666", ACTION=="add", ATTRS{product}=="ChibiOS/RT Virtual COM Port", PROGRAM="/home/bro/catkin_ws/src/pongrobot_actuation/utils/vesc_count %k" SYMLINK+="%c", GROUP="dialout"
+SUBSYSTEMS=="usb", KERNEL=="ttyACM[0-9]*", MODE="666", ACTION=="add", ATTRS{product}=="ChibiOS/RT Virtual COM Port", PROGRAM="vesc_count %k" SYMLINK+="%c", GROUP="dialout"

@@ -1,0 +1,1 @@
+SUBSYSTEMS=="usb", KERNEL=="ttyACM[0-9]*", MODE="666", ACTION=="add", ATTRS{product}=="Brobot Launcher", SYMLINK+="brobot_launcher", GROUP="dialout"
