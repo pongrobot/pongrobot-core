@@ -87,8 +87,21 @@ void yawCommandCallback(const std_msgs::Int8& yaw_msg) {
   }
 }
 
+void resetCommandCallback(const std_msgs::Empty& reset_msg) {
+    // Completely reset the system to get out of a bad state.
+    bYawIsReady = false;
+    bHasCommand = false;
+    bHasNewCommand = false;
+    bWantsLaunch = false;
+    bHasBall = false;
+    bHasBallLatch = false;
+    iSwivelState = SWIVEL_CALIBRATE_BOUNDS_LOW;
+    iLauncherState = LAUNCHER_IDLE;
+}
+
 ros::Subscriber<std_msgs::Int8> yawSubscriber("yaw_cmd", &yawCommandCallback);
 ros::Subscriber<std_msgs::Empty> triggerSubscriber("trigger", &triggerCommandCallback);
+ros::Subscriber<std_msgs::Empty> resetSubscriber("reset", &resetCommandCallback);
 
 std_msgs::Bool ready_msg;
 ros::Publisher readyPublisher("yaw_ready", &ready_msg);
@@ -147,6 +160,7 @@ void setup() {
   //nh.advertise(launcherStatePublisher);
   nh.subscribe(yawSubscriber);
   nh.subscribe(triggerSubscriber);
+  nh.subscribe(resetSubscriber);
   nh.advertise(readyPublisher);
   nh.advertise(ballPublisher);
 
@@ -248,7 +262,7 @@ void loop() {
   switch (iLauncherState) {
     case LAUNCHER_IDLE: {
       launcherServo.write(LAUNCHER_RETRACTED_POS);
-      if (bWantsLaunch) {
+      if (bWantsLaunch && iSwivelState == SWIVEL_IDLE) {
         launcherServo.write(LAUNCHER_EXTENDED_POS);
         iLauncherState = LAUNCHER_EXTENDING;
         lLauncherLastAction = millis();
