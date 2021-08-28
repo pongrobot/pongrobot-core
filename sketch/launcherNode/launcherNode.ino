@@ -59,12 +59,16 @@ int iSwivelState = SWIVEL_CALIBRATE_BOUNDS_LOW;
 long lSwivelHighPos = 0;
 long lSwivelNewTargetPos = 0;
 long lSwivelTargetPos = 0;
+long lSwivelLastYawMsg = 0;
+long lSwivelRandomNoiseAmplitude = 0;
 bool bSwivelClearedEndStop = false;
 bool bYawIsReady = false;
 bool bHasNewCommand = false;
 AccelStepper stepper(AccelStepper::DRIVER, SWIVEL_STEP_PIN, SWIVEL_DIRECTION_PIN);
 
 unsigned long lLastHeartbeatMsg = 0;
+
+void(* resetFunc) (void) = 0;
 
 // ---------------------------------------------------
 // ROS SETUP
@@ -78,7 +82,23 @@ void triggerCommandCallback(const std_msgs::Empty& launch_msg) {
 void yawCommandCallback(const std_msgs::Int8& yaw_msg) {
   // Yaw message will be a value from -90 to 90 inclusive
   // Convert this to a target position.
-  lSwivelNewTargetPos = constrain(map(-yaw_msg.data, -90, 90, 0, lSwivelHighPos),0, lSwivelHighPos);
+
+  // Compute a random noise term that increases as we target the same position multiple times
+  // Each time we receive a command that duplicates a previous angle, add some uncertainty to the measurement
+  if (lSwivelLastYawMsg == yaw_msg.data) {
+    lSwivelRandomNoiseAmplitude += 1;
+    if (lSwivelRandomNoiseAmplitude > 10) {
+      lSwivelRandomNoiseAmplitude = 10;
+    }
+  } else {
+    // Reset the uncertainty when we get a new position
+    // So the launcher starts very accurately and slowly gets more random
+    lSwivelRandomNoiseAmplitude = 0;
+  }
+  lSwivelLastYawMsg = yaw_msg.data;
+  int randomNoise = random(-lSwivelRandomNoiseAmplitude/5, lSwivelRandomNoiseAmplitude/5);
+  lSwivelNewTargetPos = constrain(map(-yaw_msg.data + randomNoise, -90, 90, 0, lSwivelHighPos),0, lSwivelHighPos);
+  
   if (lSwivelNewTargetPos != lSwivelTargetPos || bHasCommand == false) {
     lSwivelTargetPos = lSwivelNewTargetPos;
     bYawIsReady = false;
@@ -89,14 +109,7 @@ void yawCommandCallback(const std_msgs::Int8& yaw_msg) {
 
 void resetCommandCallback(const std_msgs::Empty& reset_msg) {
     // Completely reset the system to get out of a bad state.
-    bYawIsReady = false;
-    bHasCommand = false;
-    bHasNewCommand = false;
-    bWantsLaunch = false;
-    bHasBall = false;
-    bHasBallLatch = false;
-    iSwivelState = SWIVEL_CALIBRATE_BOUNDS_LOW;
-    iLauncherState = LAUNCHER_IDLE;
+    resetFunc();
 }
 
 ros::Subscriber<std_msgs::Int8> yawSubscriber("yaw_cmd", &yawCommandCallback);
@@ -205,7 +218,7 @@ void loop() {
       if (bHasBall) {
         bHasBallLatch = true;
       }
-      //sendBallMsg();
+      sendBallMsg();
       sendReadyMsg();
       nh.spinOnce();
       
@@ -287,8 +300,8 @@ void loop() {
         // Reset "Has ball" status after we have launched the ball
         bHasBall = false;
         bHasBallLatch = false;
-        //sendBallMsg();
-        //nh.spinOnce();
+        sendBallMsg();
+        nh.spinOnce();
       }
       break;
     }
