@@ -7,6 +7,7 @@ trajectory/min_yaw_angle: -85.0 # min allowable yaw angle command (deg)
 trajectory/max_yaw_angle: 85.0 # max allowable yaw angle command (deg)
 trajectory/max_initial_velocity: 1000 # max allowable velocity command (m/s)
 trajectory/target_frame: world # coordinate frame to use if the transform is available
+trajectory/use_drag: false # whether to calculate drag
 
 # Visualization config flags
 visualization/plot_traj: true # enable plotting rviz markers of the planned trajectory

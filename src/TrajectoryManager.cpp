@@ -51,7 +51,12 @@ trajectoryPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
     {
         // Calculate trajectory
         target_yaw_ = calculateYawAngle(msg);
-        target_velocity_ = calculateInitialVelocity(msg);
+        if (use_drag_)
+        {
+            target_velocity_ = calculateInitialVelocityDrag(msg);
+        } else {
+            target_velocity_ = calculateInitialVelocity(msg);
+        }
 
         // Check bounds
         bool yaw_in_range = min_yaw_angle_ < target_yaw_ && target_yaw_ < max_yaw_angle_;
@@ -68,7 +73,12 @@ trajectoryPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
             }
             if (plot_traj_)
             {
-                trajectory_pub_.publish(buildTrajectoryMarker());
+                if (use_drag_)
+                {
+                    trajectory_pub_.publish(buildTrajectoryMarkerDrag());                   
+                } else {
+                    trajectory_pub_.publish(buildTrajectoryMarker());
+                }
             }
 
         }
@@ -130,6 +140,37 @@ calculateInitialVelocity(const geometry_msgs::PoseStamped::ConstPtr& target_pose
     if( tf_buffer_.canTransform( target_pose->header.frame_id, world_frame_id_, ros::Time::now(), ros::Duration(3.0) ) )
     {
 
+        // Extract the pitch from the transform
+        double roll, pitch, yaw;
+        geometry_msgs::TransformStamped world_2_launcher = tf_buffer_.lookupTransform( target_pose->header.frame_id, world_frame_id_, ros::Time::now(), ros::Duration(0.0) );
+        tf2::Quaternion launcher_orientation;
+        tf2::convert(world_2_launcher.transform.rotation, launcher_orientation);
+        tf2::Matrix3x3 m(launcher_orientation);
+        m.getRPY(roll, pitch, yaw);
+        launcher_pitch = pitch * (180.f / M_PI);
+
+        ROS_INFO("[TrajectoryManager] World transform available, launcher pitch: %.4f deg", launcher_pitch);
+    }
+
+    // Calculate the initial velocity of the ball neglecting drag
+    double d = sqrt( pow(target_pose->pose.position.x, 2) + pow(target_pose->pose.position.y, 2) );
+    double z_c = target_pose->pose.position.z;
+    double theta = (launch_angle_deg_ + launcher_pitch) * (M_PI / 180.f);
+    
+    // Calculate time the ball hits the cup
+    contact_time_ = sqrt( ( 2.f * ( d * tan(theta) - z_c ) ) / G );
+    double launch_v = d / ( cos(theta) * contact_time_ );
+
+    return launch_v;
+}
+
+float TrajectoryManager::calculateInitialVelocityDrag(const geometry_msgs::PoseStamped::ConstPtr& target_pose )
+{
+    // Check if transform to world frame is available
+    double launcher_pitch = 0.0;
+    if( tf_buffer_.canTransform( target_pose->header.frame_id, world_frame_id_, ros::Time::now(), ros::Duration(3.0) ) )
+    {
+        
         // Extract the pitch from the transform
         double roll, pitch, yaw;
         geometry_msgs::TransformStamped world_2_launcher = tf_buffer_.lookupTransform( target_pose->header.frame_id, world_frame_id_, ros::Time::now(), ros::Duration(0.0) );
@@ -267,6 +308,13 @@ buildTrajectoryMarker()
     }
 
     return trajectory_marker;
+}
+
+visualization_msgs::Marker
+TrajectoryManager::
+buildTrajectoryMarkerDrag()
+{
+
 }
 
 void
@@ -409,6 +457,11 @@ load_params()
     if ( !nh_.getParam("trajectory/min_yaw_angle", min_yaw_angle_) )
     {
         ROS_ERROR("TrajectoryManager could not load param: %s/trajectory/min_yaw_angle", nh_.getNamespace().c_str());
+    }
+
+    if ( !nh_.getParam("trajectory/use_drag", use_drag_) )
+    {
+        ROS_ERROR("TrajectoryManager could not load param: %s/trajectory/use_drag", nh_.getNamespace().c_str());
     }
 
     if ( !nh_.getParam("trajectory/max_initial_velocity", max_initial_velocity_) )

@@ -83,10 +83,12 @@ class TrajectoryManager
         // Calculation utilities
         float calculateYawAngle( const geometry_msgs::PoseStamped::ConstPtr& target_pose);
         float calculateInitialVelocity( const geometry_msgs::PoseStamped::ConstPtr& target_pose);
+        float calculateInitialVelocityDrag( const geometry_msgs::PoseStamped::ConstPtr& target_pose);
 
         // Visualization tools
         visualization_msgs::Marker buildTargetMarker();
         visualization_msgs::Marker buildTrajectoryMarker();
+        visualization_msgs::Marker buildTrajectoryMarkerDrag();
 
         // Constants and launcher parameters
         double launch_angle_deg_;
@@ -94,6 +96,7 @@ class TrajectoryManager
         double min_yaw_angle_;
         double max_initial_velocity_;
         double const G = 9.81;
+        bool use_drag_;
 };
 
 #endif
