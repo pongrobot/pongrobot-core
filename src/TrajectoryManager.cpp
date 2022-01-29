@@ -139,7 +139,6 @@ calculateInitialVelocity(const geometry_msgs::PoseStamped::ConstPtr& target_pose
     double launcher_pitch = 0.0;
     if( tf_buffer_.canTransform( target_pose->header.frame_id, world_frame_id_, ros::Time::now(), ros::Duration(3.0) ) )
     {
-
         // Extract the pitch from the transform
         double roll, pitch, yaw;
         geometry_msgs::TransformStamped world_2_launcher = tf_buffer_.lookupTransform( target_pose->header.frame_id, world_frame_id_, ros::Time::now(), ros::Duration(0.0) );
@@ -155,7 +154,7 @@ calculateInitialVelocity(const geometry_msgs::PoseStamped::ConstPtr& target_pose
     // Calculate the initial velocity of the ball neglecting drag
     double d = sqrt( pow(target_pose->pose.position.x, 2) + pow(target_pose->pose.position.y, 2) );
     double z_c = target_pose->pose.position.z;
-    double theta = (launch_angle_deg_ + launcher_pitch) * (M_PI / 180.f);
+    double theta = (launch_angle_deg_ + launcher_pitch) * (M_PI / 180.f); // launch angle relative to gravity
     
     // Calculate time the ball hits the cup
     contact_time_ = sqrt( ( 2.f * ( d * tan(theta) - z_c ) ) / G );
@@ -164,10 +163,10 @@ calculateInitialVelocity(const geometry_msgs::PoseStamped::ConstPtr& target_pose
     return launch_v;
 }
 
-float TrajectoryManager::calculateInitialVelocityDrag(const geometry_msgs::PoseStamped::ConstPtr& target_pose )
+float TrajectoryManager::calculateInitialVelocityDrag(const geometry_msgs::PoseStamped::ConstPtr& target_pose)
 {
     // Check if transform to world frame is available
-    double launcher_pitch = 0.0;
+    float launcher_pitch = 0.0;
     if( tf_buffer_.canTransform( target_pose->header.frame_id, world_frame_id_, ros::Time::now(), ros::Duration(3.0) ) )
     {
         
@@ -184,16 +183,186 @@ float TrajectoryManager::calculateInitialVelocityDrag(const geometry_msgs::PoseS
     }
 
     // Calculate the initial velocity of the ball neglecting drag
-    double d = sqrt( pow(target_pose->pose.position.x, 2) + pow(target_pose->pose.position.y, 2) );
-    double z_c = target_pose->pose.position.z;
-    double theta = (launch_angle_deg_ + launcher_pitch) * (M_PI / 180.f);
-    
-    // Calculate time the ball hits the cup
-    contact_time_ = sqrt( ( 2.f * ( d * tan(theta) - z_c ) ) / G );
-    double launch_v = d / ( cos(theta) * contact_time_ );
+    float d = sqrt( pow(target_pose->pose.position.x, 2) + pow(target_pose->pose.position.y, 2) );
+    float z_c = target_pose->pose.position.z;
+    float theta = (launch_angle_deg_ + launcher_pitch) * (M_PI / 180.f); // launch angle relative to gravity
 
-    return launch_v;
+    // Calculate time the ball hits the cup
+    contact_time_ = sqrt( ( 2.f * ( d * tan(theta) - z_c ) ) / G ); // This is only for the trajectory Marker Builder
+
+    // initial velocity guess
+    float v0_guess = d / ( cos(theta) * contact_time_ );
+    Eigen::VectorXf x(1);
+	x(0) = v0_guess;             
+
+    LMFunctor_DragError functor;
+    functor.target_pose = target_pose->pose;
+    functor.theta = theta;
+    functor.m = 3; // 3 axes of the position error
+	functor.n = 1; // just one initial velocity
+
+    Eigen::LevenbergMarquardt<LMFunctor_DragError, float> lm(functor);
+	int status = lm.minimize(x);
+	std::cout << "LM optimization status: " << status << std::endl;
+
+    // Initializing the position array
+    trajectory_pose_array_=functor.get_trajectory_pose_array();
+    trajectory_pose_array_.header.stamp = ros::Time();
+
+    //float launch_v = fsolve(@(v0) calcDragError(target_pose,v0,theta),v0_guess)
+
+
+    return x(0);
 }
+
+struct TrajectoryManager::LMFunctor_DragError
+{
+	// 'm' pairs of (x, f(x))
+    float theta;
+    geometry_msgs::Pose target_pose;
+
+    //const geometry_msgs::PoseStamped::ConstPtr& target_pose , const std_msgs::Float32::ConstPtr& v0, const std_msgs::Float32::ConstPtr& theta
+
+	// Compute 'm' errors, one for each data point, for the given parameter values in 'x'
+	int operator()(const Eigen::VectorXf &x, Eigen::VectorXf &fvec) const
+	{
+		// 'x' has dimensions n x 1
+		// It contains the current estimates for the parameters.
+        // Only 1 parameter, which is v0.
+
+		// 'fvec' has dimensions m x 1
+		// It will contain the error for each data point.
+        
+
+
+        Eigen::Vector3f new_pose;
+        Eigen::Vector3f target_vector(3,1);
+        position_array(0,0) = 0;
+        position_array(1,0) = 0;
+        position_array(2,0) = 0;
+        (0,0,0); // starting ball position
+        target_vector <<    target_pose.position.x,
+                            target_pose.position.y,
+                            target_pose.position.z;
+		float v0 = x(0);
+
+        
+        // Ping pong ball stuff
+        double diameter = 0.04; // m
+        double radius = diameter*.5; // m
+        double mass = 0.0027; // kg
+        double air_density = 1.29; // kg/m^3
+        double drag_coefficient = 0.5; // typically .4-.6. TODO: make this a parameter.
+
+        double k_drag = drag_coefficient * air_density * M_PI * pow(diameter,2) / (8 * mass); //constant for drag
+        
+        double dt = .01; // s
+
+        float G = 9.8; // m/s^2
+
+
+        Eigen::Vector3f gravity_vector;
+        gravity_vector = Eigen::Vector3f::Constant(0,0,G);
+        Eigen::Vector3f old_v;
+        Eigen::Vector3f new_v(v0 * cos(theta), 0, v0 * sin(theta));
+
+        float t=0;
+
+        int i=0;
+        while (new_pose(2) > target_vector(2)) // while the ball is above the plane of the cup
+        {
+            old_v = new_v;
+
+            float v_mag = old_v.norm();
+
+            Eigen::Matrix3f k;
+            k << -k_drag*v_mag*dt, 0, 0, 
+                0, -k_drag*v_mag*dt, 0,
+                0, 0, -k_drag*v_mag*dt;
+            
+            new_v = old_v + k * old_v + gravity_vector*dt;
+            new_pose  += new_v*dt;
+            old_v=new_v; 
+            t+=dt;
+        }
+
+        // contact_time_ = t; // for the trajectory builder. Don't need this if already have all of the points.
+
+        // error is the difference between new pose and target pose
+        //float error = sqrt(pow(new_pose[0]-target_pose->pose.position.x,2) + pow(new_pose[0]-target_pose->pose.position.y,2) + pow(new_pose[0]-target_pose->pose.position.z,2));
+        
+        // fvec is the error
+        for (int i = 0; i < values(); i++) {
+			fvec(i) = new_pose[i]-target_vector(i);
+		}
+
+		return 0;
+	}
+
+	// Compute the jacobian of the errors
+	int df(const Eigen::VectorXf &x, Eigen::MatrixXf &fjac) const
+	{
+		// 'x' has dimensions n x 1
+		// It contains the current estimates for the parameters.
+
+		// 'fjac' has dimensions m x n
+		// It will contain the jacobian of the errors, calculated numerically in this case.
+
+		float epsilon;
+		epsilon = 1e-5f;
+
+		for (int i = 0; i < x.size(); i++) {
+			Eigen::VectorXf xPlus(x);
+			xPlus(i) += epsilon;
+			Eigen::VectorXf xMinus(x);
+			xMinus(i) -= epsilon;
+
+			Eigen::VectorXf fvecPlus(values());
+			operator()(xPlus, fvecPlus);
+
+			Eigen::VectorXf fvecMinus(values());
+			operator()(xMinus, fvecMinus);
+
+			Eigen::VectorXf fvecDiff(values());
+			fvecDiff = (fvecPlus - fvecMinus) / (2.0f * epsilon);
+
+			fjac.block(0, i, values(), 1) = fvecDiff;
+		}
+
+		return 0;
+	}
+
+	// Number of data points, i.e. values.
+	int m;
+
+	// Returns 'm', the number of values.
+	int values() const { return m; }
+
+	// The number of parameters, i.e. inputs.
+	int n;
+
+	// Returns 'n', the number of inputs.
+	int inputs() const { return n; }
+
+    Eigen::MatrixNf position_array;
+
+    geometry_msgs::PoseArray get_trajectory_pose_array()
+    {
+        geometry_msgs::PoseArray pose_array;
+        for (int i=1;i<position_array.cols();i++)
+        {
+            geometry_msgs::Pose pose_pt;
+            pose_pt.position.x = position_array(0,i);
+            pose_pt.position.y = position_array(1,i);
+            pose_pt.position.z = position_array(2,i);
+            pose_array.poses.push_back(pose_pt);
+        }
+        return pose_array;
+    }
+
+};
+
+
 
 bool
 TrajectoryManager::

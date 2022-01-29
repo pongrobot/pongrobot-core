@@ -5,6 +5,7 @@
 #include <time.h>
 #include <math.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/PoseArray.h>
 #include <visualization_msgs/Marker.h>
 #include <std_msgs/Bool.h>
 #include <std_msgs/Empty.h>
@@ -14,6 +15,9 @@
 #include <tf2_ros/buffer_interface.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2_ros/transform_listener.h>
+#include <Eigen/Dense>
+#include <Eigen/Eigen>
+#include <unsupported/Eigen/NonLinearOptimization>
 
 enum StateEnum
 {
@@ -66,6 +70,7 @@ class TrajectoryManager
         // Visualization data
         bool plot_target_;
         bool plot_traj_;
+        geometry_msgs::PoseArray trajectory_pose_array_;
 
         // TF data
         std::string world_frame_id_;
@@ -84,6 +89,8 @@ class TrajectoryManager
         float calculateYawAngle( const geometry_msgs::PoseStamped::ConstPtr& target_pose);
         float calculateInitialVelocity( const geometry_msgs::PoseStamped::ConstPtr& target_pose);
         float calculateInitialVelocityDrag( const geometry_msgs::PoseStamped::ConstPtr& target_pose);
+        float calcDragError(const geometry_msgs::PoseStamped::ConstPtr& target_pose , const std_msgs::Float32::ConstPtr& v0, const std_msgs::Float32::ConstPtr& theta);
+        struct LMFunctor_DragError;
 
         // Visualization tools
         visualization_msgs::Marker buildTargetMarker();
@@ -91,12 +98,13 @@ class TrajectoryManager
         visualization_msgs::Marker buildTrajectoryMarkerDrag();
 
         // Constants and launcher parameters
-        double launch_angle_deg_;
-        double max_yaw_angle_;
-        double min_yaw_angle_;
-        double max_initial_velocity_;
-        double const G = 9.81;
+        float launch_angle_deg_;
+        float max_yaw_angle_;
+        float min_yaw_angle_;
+        float max_initial_velocity_;
+        float const G = 9.81;
         bool use_drag_;
+
 };
 
 #endif
