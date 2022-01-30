@@ -83,3 +83,14 @@ Before the package can be run, the appropriate udev rules must be setup. This wi
 - Launcher Frame: reference frame centered at the center of the launcher. Z offset from Robot Center is defined in the config
 - Camera Frame: reference frame of the camera, transform to Robot Center frame determined from config and IMU data
 - Image Frame: image reference with z depth
+
+## Trajectory Testing (with graphics)
+1. Navigate to your catkin_ws
+2. Make sure your code is build and the workspace has be correctly sourced (`catkin_make` & `. source devel/setup.zsh`)
+3. Launch the trajectory manager launchfile `roslaunch pongrobot_actuation manager.launch`, rviz should open with the trajectory visualization config
+4. In a new shell, run `rostopic echo /launcher/velocity_cmd` to subscribe to the velocity output command
+5. In yet another shell use rostopic pub to send a target command to `/launcher/target_pose`, make sure to set the frame_id to `launcher` and edit the x&y position as desired.
+6. The TrajectoryManager should log messages showing it has received the command and calculated the correct velocity. Rviz should have rendered the target pose with trajectory, and the velocity command subscriber from step 4 should echothe calculated velocity
+7. To run with drag, replace the command from step 3 with `roslaunch pongrobot_actuation manager.launch use_drag:=true`
+
+**Note**: If your system does not have graphics setup, you can disable the rviz trajectory visualization by running the manager launchfile with the `use_graphics:=false` argument

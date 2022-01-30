@@ -17,6 +17,20 @@ find_package(catkin REQUIRED COMPONENTS
 )
 
 ###################################
+## Fix the Eigen dependency mess
+###################################
+find_package(Eigen3 QUIET)
+if(NOT EIGEN3_FOUND)
+  find_package(cmake_modules REQUIRED)
+  find_package(Eigen REQUIRED)
+  set(EIGEN3_INCLUDE_DIRS ${EIGEN_INCLUDE_DIRS})
+endif()
+
+if(NOT EIGEN3_INCLUDE_DIRS)
+  set(EIGEN3_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIR})
+endif()
+
+###################################
 ## catkin specific configuration ##
 ###################################
 ## The catkin_package macro generates cmake config files for your package
@@ -41,6 +55,7 @@ catkin_package(
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIR}
 )
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination

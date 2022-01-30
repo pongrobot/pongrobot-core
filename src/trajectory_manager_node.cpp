@@ -19,7 +19,6 @@ int main(int argc, char **argv)
 
     while (ros::ok())
     {   
-        ROS_WARN("TrajectoryManager RUNNNING" );
         trajectoryManager.run();
         ros::spinOnce();
         loop_rate.sleep();

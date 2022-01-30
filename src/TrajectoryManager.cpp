@@ -14,7 +14,6 @@ TrajectoryManager( ros::NodeHandle nh ):
     
     load_params();    
 
-
     // Setup subscribers
     trajectory_pose_sub_ = nh_.subscribe<geometry_msgs::PoseStamped>("target_pose", 1, &TrajectoryManager::trajectoryPoseCallback, this);
     vesc_ready_sub_ = nh_.subscribe<std_msgs::Bool>("vesc_ready", 1, &TrajectoryManager::vescReadyCallback, this);
@@ -27,8 +26,6 @@ TrajectoryManager( ros::NodeHandle nh ):
     trigger_pub_= nh.advertise<std_msgs::Empty>("trigger", 1);
     shot_pub_ = nh.advertise<geometry_msgs::PoseStamped>("shot",1);
     state_pub_ = nh.advertise<std_msgs::Int8>("trajectory_manager_state",1);
-    target_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("/launcher/target_pose", 100);  //BM added
-
 
     // Initialize visualization
     if (plot_target_)
@@ -45,8 +42,6 @@ void
 TrajectoryManager::
 trajectoryPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
 {
-    ROS_WARN("Callback!");    
-
     // Store message
     target_pose_ = *msg;
 
@@ -61,6 +56,7 @@ trajectoryPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
         } else {
             target_velocity_ = calculateInitialVelocity(msg);
         }
+
         ROS_WARN("Calculated velocity: %f m/s", target_velocity_);    
 
         // Check bounds
@@ -237,8 +233,6 @@ int TrajectoryManager::LMFunctor_DragError::operator()(const Eigen::VectorXf &x,
     // 'fvec' has dimensions m x 1
     // It will contain the error for each data point.
     
-
-
     Eigen::Vector3f new_pose(3);
     new_pose << 0,
                 0,
@@ -251,11 +245,8 @@ int TrajectoryManager::LMFunctor_DragError::operator()(const Eigen::VectorXf &x,
                         target_pose.position.y,
                         target_pose.position.z;
 
-
-
     float v0 = x(0);
 
-    
     // Ping pong ball stuff
     double diameter = 0.04; // m
     double radius = diameter*.5; // m
@@ -268,7 +259,6 @@ int TrajectoryManager::LMFunctor_DragError::operator()(const Eigen::VectorXf &x,
     double dt = .01; // s
 
     float G = 9.8; // m/s^2
-
 
     Eigen::Vector3f gravity_vector;
     gravity_vector = Eigen::Vector3f::Constant(0,0,G);
@@ -345,9 +335,20 @@ int TrajectoryManager::LMFunctor_DragError::df(const Eigen::VectorXf &x, Eigen::
 
     return 0;
 }
-int TrajectoryManager::LMFunctor_DragError::values() const { return m; }
-int TrajectoryManager::LMFunctor_DragError::inputs() const { return n; }
 
+int 
+TrajectoryManager::LMFunctor_DragError::
+values() const
+{ 
+    return m; 
+}
+
+int
+TrajectoryManager::LMFunctor_DragError::
+inputs() const
+{
+    return n;
+}
 
 geometry_msgs::PoseArray TrajectoryManager::LMFunctor_DragError::get_trajectory_pose_array()
 {
@@ -362,8 +363,6 @@ geometry_msgs::PoseArray TrajectoryManager::LMFunctor_DragError::get_trajectory_
     }
     return pose_array;
 }
-
-
 
 bool
 TrajectoryManager::
@@ -546,26 +545,6 @@ run()
     {
         case StateEnum::IDLE:
         {
-
-            ROS_WARN("BEN IS TESTING");
-            geometry_msgs::PoseStamped pose_test;
-            ROS_WARN("BEN IS TESTING 2");
-            pose_test.pose.position.x = 5;
-            pose_test.pose.position.y = 5;
-            pose_test.pose.position.z = -1;
-            ROS_WARN("BEN IS TESTING 3");
-            // target_velocity_ = calculateInitialVelocity(&pose_test);
-            target_pub_.publish(pose_test);
-            ROS_WARN("BEN IS TESTING 4");
-
-// Having issues with the pointers/constants. Maybe I'll try publishing here. 
-
-
-// const geometry_msgs::PoseStamped::ConstPtr& msg)
-// {
-//     // Store message
-//     target_pose_ = *msg;
-
             // Check for new command
             if( handleNewCommand() )
             {
