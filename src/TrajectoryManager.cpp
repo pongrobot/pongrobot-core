@@ -27,6 +27,8 @@ TrajectoryManager( ros::NodeHandle nh ):
     trigger_pub_= nh.advertise<std_msgs::Empty>("trigger", 1);
     shot_pub_ = nh.advertise<geometry_msgs::PoseStamped>("shot",1);
     state_pub_ = nh.advertise<std_msgs::Int8>("trajectory_manager_state",1);
+    target_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("/launcher/target_pose", 100);  //BM added
+
 
     // Initialize visualization
     if (plot_target_)
@@ -43,6 +45,8 @@ void
 TrajectoryManager::
 trajectoryPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
 {
+    ROS_WARN("Callback!");    
+
     // Store message
     target_pose_ = *msg;
 
@@ -57,6 +61,7 @@ trajectoryPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
         } else {
             target_velocity_ = calculateInitialVelocity(msg);
         }
+        ROS_WARN("Calculated velocity: %f m/s", target_velocity_);    
 
         // Check bounds
         bool yaw_in_range = min_yaw_angle_ < target_yaw_ && target_yaw_ < max_yaw_angle_;
@@ -215,152 +220,148 @@ float TrajectoryManager::calculateInitialVelocityDrag(const geometry_msgs::PoseS
     return x(0);
 }
 
-struct TrajectoryManager::LMFunctor_DragError
+void TrajectoryManager::LMFunctor_DragError::set_position_array(const Eigen::Matrix<float, 3, Eigen::Dynamic>& pos_matrix) {
+    position_array = pos_matrix;
+}
+Eigen::Matrix<float, 3, Eigen::Dynamic> TrajectoryManager::LMFunctor_DragError::get_position_array() const{
+    return position_array;
+}
+
+// Compute 'm' errors, one for each data point, for the given parameter values in 'x'
+int TrajectoryManager::LMFunctor_DragError::operator()(const Eigen::VectorXf &x, Eigen::VectorXf &fvec) 
 {
-	// 'm' pairs of (x, f(x))
-    float theta;
-    geometry_msgs::Pose target_pose;
+    // 'x' has dimensions n x 1
+    // It contains the current estimates for the parameters.
+    // Only 1 parameter, which is v0.
 
-    //const geometry_msgs::PoseStamped::ConstPtr& target_pose , const std_msgs::Float32::ConstPtr& v0, const std_msgs::Float32::ConstPtr& theta
-
-	// Compute 'm' errors, one for each data point, for the given parameter values in 'x'
-	int operator()(const Eigen::VectorXf &x, Eigen::VectorXf &fvec) const
-	{
-		// 'x' has dimensions n x 1
-		// It contains the current estimates for the parameters.
-        // Only 1 parameter, which is v0.
-
-		// 'fvec' has dimensions m x 1
-		// It will contain the error for each data point.
-        
+    // 'fvec' has dimensions m x 1
+    // It will contain the error for each data point.
+    
 
 
-        Eigen::Vector3f new_pose;
-        Eigen::Vector3f target_vector(3,1);
-        position_array(0,0) = 0;
-        position_array(1,0) = 0;
-        position_array(2,0) = 0;
-        (0,0,0); // starting ball position
-        target_vector <<    target_pose.position.x,
-                            target_pose.position.y,
-                            target_pose.position.z;
-		float v0 = x(0);
-
-        
-        // Ping pong ball stuff
-        double diameter = 0.04; // m
-        double radius = diameter*.5; // m
-        double mass = 0.0027; // kg
-        double air_density = 1.29; // kg/m^3
-        double drag_coefficient = 0.5; // typically .4-.6. TODO: make this a parameter.
-
-        double k_drag = drag_coefficient * air_density * M_PI * pow(diameter,2) / (8 * mass); //constant for drag
-        
-        double dt = .01; // s
-
-        float G = 9.8; // m/s^2
+    Eigen::Vector3f new_pose(3);
+    new_pose << 0,
+                0,
+                0;
+    Eigen::Matrix<float, 3, Eigen::Dynamic> pos_matrix;
+    pos_matrix.col(0) = new_pose;
+    
+    Eigen::Vector3f target_vector(3);
+    target_vector <<    target_pose.position.x,
+                        target_pose.position.y,
+                        target_pose.position.z;
 
 
-        Eigen::Vector3f gravity_vector;
-        gravity_vector = Eigen::Vector3f::Constant(0,0,G);
-        Eigen::Vector3f old_v;
-        Eigen::Vector3f new_v(v0 * cos(theta), 0, v0 * sin(theta));
 
-        float t=0;
+    float v0 = x(0);
 
-        int i=0;
-        while (new_pose(2) > target_vector(2)) // while the ball is above the plane of the cup
-        {
-            old_v = new_v;
+    
+    // Ping pong ball stuff
+    double diameter = 0.04; // m
+    double radius = diameter*.5; // m
+    double mass = 0.0027; // kg
+    double air_density = 1.29; // kg/m^3
+    double drag_coefficient = 0.5; // typically .4-.6. TODO: make this a parameter.
 
-            float v_mag = old_v.norm();
+    double k_drag = drag_coefficient * air_density * M_PI * pow(diameter,2) / (8 * mass); //constant for drag
+    
+    double dt = .01; // s
 
-            Eigen::Matrix3f k;
-            k << -k_drag*v_mag*dt, 0, 0, 
-                0, -k_drag*v_mag*dt, 0,
-                0, 0, -k_drag*v_mag*dt;
-            
-            new_v = old_v + k * old_v + gravity_vector*dt;
-            new_pose  += new_v*dt;
-            old_v=new_v; 
-            t+=dt;
-        }
+    float G = 9.8; // m/s^2
 
-        // contact_time_ = t; // for the trajectory builder. Don't need this if already have all of the points.
 
-        // error is the difference between new pose and target pose
-        //float error = sqrt(pow(new_pose[0]-target_pose->pose.position.x,2) + pow(new_pose[0]-target_pose->pose.position.y,2) + pow(new_pose[0]-target_pose->pose.position.z,2));
-        
-        // fvec is the error
-        for (int i = 0; i < values(); i++) {
-			fvec(i) = new_pose[i]-target_vector(i);
-		}
+    Eigen::Vector3f gravity_vector;
+    gravity_vector = Eigen::Vector3f::Constant(0,0,G);
+    Eigen::Vector3f old_v;
+    Eigen::Vector3f new_v(v0 * cos(theta), 0, v0 * sin(theta));
 
-		return 0;
-	}
+    float t=0;
 
-	// Compute the jacobian of the errors
-	int df(const Eigen::VectorXf &x, Eigen::MatrixXf &fjac) const
-	{
-		// 'x' has dimensions n x 1
-		// It contains the current estimates for the parameters.
-
-		// 'fjac' has dimensions m x n
-		// It will contain the jacobian of the errors, calculated numerically in this case.
-
-		float epsilon;
-		epsilon = 1e-5f;
-
-		for (int i = 0; i < x.size(); i++) {
-			Eigen::VectorXf xPlus(x);
-			xPlus(i) += epsilon;
-			Eigen::VectorXf xMinus(x);
-			xMinus(i) -= epsilon;
-
-			Eigen::VectorXf fvecPlus(values());
-			operator()(xPlus, fvecPlus);
-
-			Eigen::VectorXf fvecMinus(values());
-			operator()(xMinus, fvecMinus);
-
-			Eigen::VectorXf fvecDiff(values());
-			fvecDiff = (fvecPlus - fvecMinus) / (2.0f * epsilon);
-
-			fjac.block(0, i, values(), 1) = fvecDiff;
-		}
-
-		return 0;
-	}
-
-	// Number of data points, i.e. values.
-	int m;
-
-	// Returns 'm', the number of values.
-	int values() const { return m; }
-
-	// The number of parameters, i.e. inputs.
-	int n;
-
-	// Returns 'n', the number of inputs.
-	int inputs() const { return n; }
-
-    Eigen::MatrixNf position_array;
-
-    geometry_msgs::PoseArray get_trajectory_pose_array()
+    int i=0;
+    while (new_pose(2) > target_vector(2)) // while the ball is above the plane of the cup
     {
-        geometry_msgs::PoseArray pose_array;
-        for (int i=1;i<position_array.cols();i++)
-        {
-            geometry_msgs::Pose pose_pt;
-            pose_pt.position.x = position_array(0,i);
-            pose_pt.position.y = position_array(1,i);
-            pose_pt.position.z = position_array(2,i);
-            pose_array.poses.push_back(pose_pt);
-        }
-        return pose_array;
+        old_v = new_v;
+
+        float v_mag = old_v.norm();
+
+        Eigen::Matrix3f k;
+        k << -k_drag*v_mag*dt, 0, 0, 
+            0, -k_drag*v_mag*dt, 0,
+            0, 0, -k_drag*v_mag*dt;
+        
+        new_v = old_v + k * old_v + gravity_vector*dt;
+        new_pose  += new_v*dt;
+        pos_matrix.resize(pos_matrix.rows(),pos_matrix.cols()+1); // Add a column	
+        pos_matrix.col(pos_matrix.cols()-1) = new_pose;
+        old_v=new_v; 
+        t+=dt;
     }
 
-};
+    // contact_time_ = t; // for the trajectory builder. Don't need this if already have all of the points.
+
+    // error is the difference between new pose and target pose
+    //float error = sqrt(pow(new_pose[0]-target_pose->pose.position.x,2) + pow(new_pose[0]-target_pose->pose.position.y,2) + pow(new_pose[0]-target_pose->pose.position.z,2));
+    
+    // fvec is the error 
+    // looping through x,y,z to get each dimension's error.
+    for (int i = 0; i < 3; i++) {
+        fvec(i) = new_pose[i]-target_vector(i);
+    }
+    
+    set_position_array(pos_matrix);
+
+    return 0;
+}
+
+// Compute the jacobian of the errors
+int TrajectoryManager::LMFunctor_DragError::df(const Eigen::VectorXf &x, Eigen::MatrixXf &fjac) 
+{
+    // 'x' has dimensions n x 1
+    // It contains the current estimates for the parameters.
+
+    // 'fjac' has dimensions m x n
+    // It will contain the jacobian of the errors, calculated numerically in this case.
+
+    float epsilon;
+    epsilon = 1e-5f;
+
+    for (int i = 0; i < x.size(); i++) {
+        Eigen::VectorXf xPlus(x);
+        xPlus(i) += epsilon;
+        Eigen::VectorXf xMinus(x);
+        xMinus(i) -= epsilon;
+
+        Eigen::VectorXf fvecPlus(values());
+        operator()(xPlus, fvecPlus);
+
+        Eigen::VectorXf fvecMinus(values());
+        operator()(xMinus, fvecMinus);
+
+        Eigen::VectorXf fvecDiff(values());
+        fvecDiff = (fvecPlus - fvecMinus) / (2.0f * epsilon);
+
+        fjac.block(0, i, values(), 1) = fvecDiff;
+    }
+
+    return 0;
+}
+int TrajectoryManager::LMFunctor_DragError::values() const { return m; }
+int TrajectoryManager::LMFunctor_DragError::inputs() const { return n; }
+
+
+geometry_msgs::PoseArray TrajectoryManager::LMFunctor_DragError::get_trajectory_pose_array()
+{
+    geometry_msgs::PoseArray pose_array;
+    for (int i=1;i<position_array.cols();i++)
+    {
+        geometry_msgs::Pose pose_pt;
+        pose_pt.position.x = position_array(0,i);
+        pose_pt.position.y = position_array(1,i);
+        pose_pt.position.z = position_array(2,i);
+        pose_array.poses.push_back(pose_pt);
+    }
+    return pose_array;
+}
 
 
 
@@ -483,7 +484,52 @@ visualization_msgs::Marker
 TrajectoryManager::
 buildTrajectoryMarkerDrag()
 {
+    geometry_msgs::Quaternion identity;
+    identity.w = 1.f;
 
+    // Create marker
+    visualization_msgs::Marker trajectory_marker;
+    trajectory_marker.header.frame_id = target_pose_.header.frame_id;
+    trajectory_marker.header.stamp = ros::Time();
+    trajectory_marker.ns = "launcher_traj";
+    trajectory_marker.id = 0;
+    trajectory_marker.type = visualization_msgs::Marker::LINE_STRIP;
+    trajectory_marker.action = visualization_msgs::Marker::ADD;
+    trajectory_marker.pose.orientation = identity; // TODO: make identity quaternion
+    trajectory_marker.scale.x = 0.1;
+    trajectory_marker.scale.y = 0.1;
+    trajectory_marker.scale.z = 0.1;
+    trajectory_marker.color.a = 1.0;
+    trajectory_marker.color.r = 0.0;
+    trajectory_marker.color.g = 0.0;
+    trajectory_marker.color.b = 1.0;
+
+    // Initialize time vector
+    int num_steps = 100;
+    double step_size = (contact_time_)/num_steps; 
+
+    // Cache some important values
+    float r2y = sin(target_yaw_ * M_PI/180.f);
+    float r2x = cos(target_yaw_ * M_PI/180.f);
+    float r_dot = target_velocity_ * cos(launch_angle_deg_ * M_PI/180.f);
+    float z_dot = target_velocity_ * sin(launch_angle_deg_ * M_PI/180.f);
+
+    // Loop over time interval
+    for(int i = 0; i <= num_steps; i++)
+    {
+        // Calculate point along trajectory
+        double t = i * step_size; 
+        float r = r_dot * t; 
+        float z = z_dot * t - (0.5 * G * pow(t,2)); 
+
+        geometry_msgs::Point point;
+        point.x = r * r2x;
+        point.y = r * r2y;
+        point.z = z;
+        trajectory_marker.points.push_back(point);
+    }
+
+    return trajectory_marker;
 }
 
 void
@@ -500,6 +546,26 @@ run()
     {
         case StateEnum::IDLE:
         {
+
+            ROS_WARN("BEN IS TESTING");
+            geometry_msgs::PoseStamped pose_test;
+            ROS_WARN("BEN IS TESTING 2");
+            pose_test.pose.position.x = 5;
+            pose_test.pose.position.y = 5;
+            pose_test.pose.position.z = -1;
+            ROS_WARN("BEN IS TESTING 3");
+            // target_velocity_ = calculateInitialVelocity(&pose_test);
+            target_pub_.publish(pose_test);
+            ROS_WARN("BEN IS TESTING 4");
+
+// Having issues with the pointers/constants. Maybe I'll try publishing here. 
+
+
+// const geometry_msgs::PoseStamped::ConstPtr& msg)
+// {
+//     // Store message
+//     target_pose_ = *msg;
+
             // Check for new command
             if( handleNewCommand() )
             {

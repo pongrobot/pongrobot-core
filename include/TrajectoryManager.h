@@ -90,7 +90,44 @@ class TrajectoryManager
         float calculateInitialVelocity( const geometry_msgs::PoseStamped::ConstPtr& target_pose);
         float calculateInitialVelocityDrag( const geometry_msgs::PoseStamped::ConstPtr& target_pose);
         float calcDragError(const geometry_msgs::PoseStamped::ConstPtr& target_pose , const std_msgs::Float32::ConstPtr& v0, const std_msgs::Float32::ConstPtr& theta);
-        struct LMFunctor_DragError;
+        struct LMFunctor_DragError
+        {
+            // 'm' pairs of (x, f(x))
+            float theta;
+            geometry_msgs::Pose target_pose;
+
+            //const geometry_msgs::PoseStamped::ConstPtr& target_pose , const std_msgs::Float32::ConstPtr& v0, const std_msgs::Float32::ConstPtr& theta
+
+            // Compute 'm' errors, one for each data point, for the given parameter values in 'x'
+            int operator()(const Eigen::VectorXf &x, Eigen::VectorXf &fvec) ;
+            
+
+            // Compute the jacobian of the errors
+            int df(const Eigen::VectorXf &x, Eigen::MatrixXf &fjac) ;
+            
+
+            // Number of data points, i.e. values.
+            int m;
+
+            // // Returns 'm', the number of values.
+            int values() const;
+
+            // The number of parameters, i.e. inputs.
+            int n;
+
+            // // Returns 'n', the number of inputs.
+            int inputs() const;
+
+
+            geometry_msgs::PoseArray get_trajectory_pose_array();
+
+            void set_position_array(const Eigen::Matrix<float, 3, Eigen::Dynamic>& pos_matrix) ;
+            Eigen::Matrix<float, 3, Eigen::Dynamic> get_position_array() const;
+            Eigen::Matrix<float, 3, Eigen::Dynamic> position_array;
+
+        };
+        //BEN Test: remove later
+        float calculateInitialVelocity_TEST(const geometry_msgs::PoseStamped target_pose );
 
         // Visualization tools
         visualization_msgs::Marker buildTargetMarker();
