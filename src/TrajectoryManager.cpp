@@ -216,10 +216,10 @@ float TrajectoryManager::calculateInitialVelocityDrag(const geometry_msgs::PoseS
     return x(0);
 }
 
-void TrajectoryManager::LMFunctor_DragError::set_position_array(const Eigen::Matrix<float, 3, Eigen::Dynamic>& pos_matrix) {
+void TrajectoryManager::LMFunctor_DragError::set_position_array(const geometry_msgs::PoseArray& pos_matrix) {
     position_array = pos_matrix;
 }
-Eigen::Matrix<float, 3, Eigen::Dynamic> TrajectoryManager::LMFunctor_DragError::get_position_array() const{
+geometry_msgs::PoseArray TrajectoryManager::LMFunctor_DragError::get_position_array() const{
     return position_array;
 }
 
@@ -237,8 +237,15 @@ int TrajectoryManager::LMFunctor_DragError::operator()(const Eigen::VectorXf &x,
     new_pose << 0,
                 0,
                 0;
-    Eigen::Matrix<float, 3, Eigen::Dynamic> pos_matrix;
-    pos_matrix.col(0) = new_pose;
+        
+
+    geometry_msgs::Pose new_pose_pose;
+
+    geometry_msgs::PoseArray calculated_poses;
+    new_pose_pose.position.x = new_pose(1);
+    new_pose_pose.position.y = new_pose(2);
+    new_pose_pose.position.z = new_pose(3);
+    calculated_poses.poses.push_back(new_pose_pose);
     
     Eigen::Vector3f target_vector(3);
     target_vector <<    target_pose.position.x,
@@ -281,8 +288,11 @@ int TrajectoryManager::LMFunctor_DragError::operator()(const Eigen::VectorXf &x,
         
         new_v = old_v + k * old_v + gravity_vector*dt;
         new_pose  += new_v*dt;
-        pos_matrix.resize(pos_matrix.rows(),pos_matrix.cols()+1); // Add a column	
-        pos_matrix.col(pos_matrix.cols()-1) = new_pose;
+
+        new_pose_pose.position.x = new_pose(1);
+        new_pose_pose.position.y = new_pose(2);
+        new_pose_pose.position.z = new_pose(3);
+        calculated_poses.poses.push_back(new_pose_pose);
         old_v=new_v; 
         t+=dt;
     }
@@ -298,7 +308,7 @@ int TrajectoryManager::LMFunctor_DragError::operator()(const Eigen::VectorXf &x,
         fvec(i) = new_pose[i]-target_vector(i);
     }
     
-    set_position_array(pos_matrix);
+    set_position_array(calculated_poses);
 
     return 0;
 }
@@ -352,16 +362,16 @@ inputs() const
 
 geometry_msgs::PoseArray TrajectoryManager::LMFunctor_DragError::get_trajectory_pose_array()
 {
-    geometry_msgs::PoseArray pose_array;
-    for (int i=1;i<position_array.cols();i++)
-    {
-        geometry_msgs::Pose pose_pt;
-        pose_pt.position.x = position_array(0,i);
-        pose_pt.position.y = position_array(1,i);
-        pose_pt.position.z = position_array(2,i);
-        pose_array.poses.push_back(pose_pt);
-    }
-    return pose_array;
+    // geometry_msgs::PoseArray pose_array;
+    // for (int i=1;i<position_array.cols();i++)
+    // {
+    //     geometry_msgs::Pose pose_pt;
+    //     pose_pt.position.x = position_array(0,i);
+    //     pose_pt.position.y = position_array(1,i);
+    //     pose_pt.position.z = position_array(2,i);
+    //     pose_array.poses.push_back(pose_pt);
+    // }
+    return position_array;
 }
 
 bool

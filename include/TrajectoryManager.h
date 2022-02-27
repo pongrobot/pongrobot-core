@@ -18,6 +18,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Eigen>
 #include <unsupported/Eigen/NonLinearOptimization>
+#include <vector>
 
 enum StateEnum
 {
@@ -132,9 +133,9 @@ class TrajectoryManager
 
             geometry_msgs::PoseArray get_trajectory_pose_array();
 
-            void set_position_array(const Eigen::Matrix<float, 3, Eigen::Dynamic>& pos_matrix) ;
-            Eigen::Matrix<float, 3, Eigen::Dynamic> get_position_array() const;
-            Eigen::Matrix<float, 3, Eigen::Dynamic> position_array;
+            void set_position_array(const geometry_msgs::PoseArray& pos_matrix) ;
+            geometry_msgs::PoseArray get_position_array() const;
+            geometry_msgs::PoseArray position_array;
 
         };
 
