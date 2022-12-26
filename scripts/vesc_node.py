@@ -21,7 +21,6 @@ class VescHandler:
         self.rpm_sub = rospy.Subscriber("rpm_cmd", Float32, self.rpm_callback)
         self.vel_sub = rospy.Subscriber("velocity_cmd", Float32, self.vel_callback)
         self.trigger_sub = rospy.Subscriber("trigger", Empty, self.trigger_callback)
-        self.calibration_sub = rospy.Subscriber("/calibration/request", Empty, self.calibration_callback)
         self.ready_pub = rospy.Publisher("vesc_ready", Bool, queue_size=10)
 
         self.load_config()
@@ -71,11 +70,6 @@ class VescHandler:
         self.rpm_cal_m = rospy.get_param("vesc/rpm_calibration_slope")
         self.rpm_cal_b = rospy.get_param("vesc/rpm_calibration_offset")
         self.fudge = rospy.get_param("vesc/fudge") 
-
-    def calibration_callback(self, msg):
-        self.rpm_cal_m = rospy.get_param("vesc/rpm_calibration_slope")
-        self.rpm_cal_b = rospy.get_param("vesc/rpm_calibration_offset")
-        self.fudge = rospy.get_param("vesc/fudge")
 
     def duty_cycle_callback(self, msg):
         if msg.data > 100:
@@ -149,6 +143,11 @@ class VescHandler:
             self.port2.write( pyvesc.encode( pyvesc.SetDutyCycle( int((self.duty_cycle_cmd) * 1000) )) )
 
     def send_rpm_command(self):
+
+        self.rpm_cal_m = rospy.get_param("vesc/rpm_calibration_slope")
+        self.rpm_cal_b = rospy.get_param("vesc/rpm_calibration_offset")
+        self.fudge = rospy.get_param("vesc/fudge")
+
         if self.port1_open and self.port2_open:
             if self.rpm_cmd < self.target_rpm:
                 self.rpm_cmd = self.initial_rpm + (rospy.get_rostime() - self.last_command_time).to_sec() * self.RPM_ACCEL
