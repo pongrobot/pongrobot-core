@@ -21,6 +21,7 @@ class VescHandler:
         self.rpm_sub = rospy.Subscriber("rpm_cmd", Float32, self.rpm_callback)
         self.vel_sub = rospy.Subscriber("velocity_cmd", Float32, self.vel_callback)
         self.trigger_sub = rospy.Subscriber("trigger", Empty, self.trigger_callback)
+        self.calibration_sub = rospy.Subscriber("/calibration/request", Empty, self.calibration_callback)
         self.ready_pub = rospy.Publisher("vesc_ready", Bool, queue_size=10)
 
         self.load_config()
@@ -67,9 +68,14 @@ class VescHandler:
         self.cooldown_time = rospy.get_param("vesc/cooldown_time") # time to wait after trigger to shut down motor (sec)
         self.command_timeout = rospy.get_param("vesc/command_timeout")
         self.MAX_RPM = rospy.get_param("vesc/max_rpm")
-        self.RPM_CAL_M = rospy.get_param("vesc/rpm_calibration_slope")
-        self.RPM_CAL_B = rospy.get_param("vesc/rpm_calibration_offset")
-        self.FUDGE = rospy.get_param("vesc/fudge") 
+        self.rpm_cal_m = rospy.get_param("vesc/rpm_calibration_slope")
+        self.rpm_cal_b = rospy.get_param("vesc/rpm_calibration_offset")
+        self.fudge = rospy.get_param("vesc/fudge") 
+
+    def calibration_callback(self, msg):
+        self.rpm_cal_m = rospy.get_param("vesc/rpm_calibration_slope")
+        self.rpm_cal_b = rospy.get_param("vesc/rpm_calibration_offset")
+        self.fudge = rospy.get_param("vesc/fudge")
 
     def duty_cycle_callback(self, msg):
         if msg.data > 100:
@@ -150,8 +156,8 @@ class VescHandler:
                 self.rpm_cmd = self.target_rpm
             
             # Apply linear RPM calibration
-            actual_cmd = self.rpm_cmd*self.RPM_CAL_M + self.RPM_CAL_B
-            actual_cmd = actual_cmd * self.FUDGE
+            actual_cmd = self.rpm_cmd*self.rpm_cal_m + self.rpm_cal_b
+            actual_cmd = actual_cmd * self.fudge
 
             rospy.logdebug('Sending RPM_COMMAND = ' + str(self.rpm_cmd))
             self.port1.write( pyvesc.encode( pyvesc.SetRPM( int(actual_cmd * self.num_motor_poles)) ) )
