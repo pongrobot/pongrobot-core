@@ -67,9 +67,9 @@ class VescHandler:
         self.cooldown_time = rospy.get_param("vesc/cooldown_time") # time to wait after trigger to shut down motor (sec)
         self.command_timeout = rospy.get_param("vesc/command_timeout")
         self.MAX_RPM = rospy.get_param("vesc/max_rpm")
-        self.RPM_CAL_M = rospy.get_param("vesc/rpm_calibration_slope")
-        self.RPM_CAL_B = rospy.get_param("vesc/rpm_calibration_offset")
-        self.FUDGE = rospy.get_param("vesc/fudge") 
+        self.rpm_cal_m = rospy.get_param("vesc/rpm_calibration_slope")
+        self.rpm_cal_b = rospy.get_param("vesc/rpm_calibration_offset")
+        self.fudge = rospy.get_param("vesc/fudge") 
 
     def duty_cycle_callback(self, msg):
         if msg.data > 100:
@@ -143,6 +143,11 @@ class VescHandler:
             self.port2.write( pyvesc.encode( pyvesc.SetDutyCycle( int((self.duty_cycle_cmd) * 1000) )) )
 
     def send_rpm_command(self):
+
+        self.rpm_cal_m = rospy.get_param("vesc/rpm_calibration_slope")
+        self.rpm_cal_b = rospy.get_param("vesc/rpm_calibration_offset")
+        self.fudge = rospy.get_param("vesc/fudge")
+
         if self.port1_open and self.port2_open:
             if self.rpm_cmd < self.target_rpm:
                 self.rpm_cmd = self.initial_rpm + (rospy.get_rostime() - self.last_command_time).to_sec() * self.RPM_ACCEL
@@ -150,8 +155,8 @@ class VescHandler:
                 self.rpm_cmd = self.target_rpm
             
             # Apply linear RPM calibration
-            actual_cmd = self.rpm_cmd*self.RPM_CAL_M + self.RPM_CAL_B
-            actual_cmd = actual_cmd * self.FUDGE
+            actual_cmd = self.rpm_cmd*self.rpm_cal_m + self.rpm_cal_b
+            actual_cmd = actual_cmd * self.fudge
 
             rospy.logdebug('Sending RPM_COMMAND = ' + str(self.rpm_cmd))
             self.port1.write( pyvesc.encode( pyvesc.SetRPM( int(actual_cmd * self.num_motor_poles)) ) )
