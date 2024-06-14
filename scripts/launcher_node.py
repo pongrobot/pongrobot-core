@@ -24,6 +24,9 @@ class LauncherHandler:
 
         self.load_config()
 
+        self.yaw_ready_val = 0
+        self.ball_ready_val = 0
+
         # Port data
         self.port_name = port1
         self.port_open = False
@@ -104,11 +107,21 @@ class LauncherHandler:
                             self.serial_buffer = ""
 
             if self.heartbeat_raw is not None:
-                self.yaw_ready_pub.publish(Bool(int(self.heartbeat_split[5] == 1)))
-                self.has_ball_pub.publish(Bool(int(self.heartbeat_split[6] == 1)))
+                if self.yaw_ready_val != int(self.heartbeat_split[5]):
+                    self.yaw_ready_val = int(self.heartbeat_split[5])
+                    self.yaw_ready_pub.publish(Bool(self.yaw_ready_val == 1))
+                
+                if self.ball_ready_val != int(self.heartbeat_split[6]):
+                    self.ball_ready_val = int(self.heartbeat_split[6])
+                    self.has_ball_pub.publish(Bool(self.ball_ready_val == 1))
             else:
-                self.yaw_ready_pub.publish(Bool(False))
-                self.has_ball_pub.publish(Bool(False))
+                if self.yaw_ready_val != 0:
+                    self.yaw_ready_pub.publish(Bool(self.yaw_ready_val == 1))
+                    self.yaw_ready_val = 0
+                
+                if self.ball_ready_val != 0
+                    self.has_ball_pub.publish(Bool(False))
+                    self.ball_ready_val = 0
     
             self.rate.sleep()
 
