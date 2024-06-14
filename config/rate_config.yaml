@@ -1,3 +1,4 @@
 # Node rate config data
 trajectory: 20.0 # rate to run the TrajectoryManager node (hz)
 vesc: 20.0 # loop rate for the VESC node (hz)
+launcher: 20.0 # loop rate for the launcher (hz)

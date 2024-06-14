@@ -23,7 +23,7 @@ TrajectoryManager( ros::NodeHandle nh ):
 
     // Setup publishers
     vesc_cmd_pub_= nh.advertise<std_msgs::Float32>("velocity_cmd", 1);
-    yaw_cmd_pub_= nh.advertise<std_msgs::Int8>("yaw_cmd", 1);
+    yaw_cmd_pub_= nh.advertise<std_msgs::Float32>("yaw_cmd", 1);
     trigger_pub_= nh.advertise<std_msgs::Empty>("trigger", 1);
     shot_pub_ = nh.advertise<geometry_msgs::PoseStamped>("shot",1);
     state_pub_ = nh.advertise<std_msgs::Int8>("trajectory_manager_state",1);
@@ -307,8 +307,8 @@ run()
             }
 
             // Send yaw command
-            std_msgs::Int8 yaw_cmd;
-            yaw_cmd.data = (int) target_yaw_;
+            std_msgs::Float32 yaw_cmd;
+            yaw_cmd.data = target_yaw_;
             yaw_cmd_pub_.publish(yaw_cmd);
 
             // Send initial velocity command
