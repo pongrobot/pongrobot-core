@@ -2,6 +2,27 @@
 #include <AccelStepper.h>
 
 // ---------------------------------------------------
+// UTILS
+
+String getValue(String data, char separator, int index)
+{
+  int found = 0;
+  int strIndex[] = {0, -1};
+  int maxIndex = data.length()-1;
+
+  for(int i=0; i<=maxIndex && found<=index; i++){
+    if(data.charAt(i)==separator || i==maxIndex){
+        found++;
+        strIndex[0] = strIndex[1]+1;
+        strIndex[1] = (i == maxIndex) ? i+1 : i;
+    }
+  }
+
+  return found>index ? data.substring(strIndex[0], strIndex[1]) : "";
+}
+
+
+// ---------------------------------------------------
 // CONSTANTS
 
 // Yaw Swivel states
@@ -56,13 +77,19 @@ long lSwivelHighPos = 0;
 long lSwivelNewTargetPos = 0;
 long lSwivelTargetPos = 0;
 long lSwivelLastYawMsg = 0;
+long lLauncherExtendDuration = LAUNCHER_EXTEND_DURATION;
 bool bSwivelClearedEndStop = false;
 bool bYawIsReady = false;
 bool bHasNewCommand = false;
 bool bInitiallyConnecting = true;
 AccelStepper stepper(AccelStepper::DRIVER, SWIVEL_STEP_PIN, SWIVEL_DIRECTION_PIN);
 
+// Heartbeat (serial out)
 unsigned long lLastHeartbeatMsg = 0;
+
+// Serial in command buffer
+static unsigned char cBytesRead = 0;
+static unsigned char cSerialBuffer[64];
 
 void(* resetFunc) (void) = 0;
 
@@ -77,7 +104,7 @@ void yawCommandCallback(int yaw_msg) {
   // Yaw message will be a value from -90 to 90 inclusive
   // Convert this to a target position.
   lSwivelLastYawMsg = yaw_msg;
-  lSwivelNewTargetPos = constrain(map(-yaw_msg, -90, 90, 0, lSwivelHighPos),0, lSwivelHighPos);
+  lSwivelNewTargetPos = constrain(map(-yaw_msg, -45, 45, 0, lSwivelHighPos),0, lSwivelHighPos);
   
   if (lSwivelNewTargetPos != lSwivelTargetPos || bHasCommand == false) {
     lSwivelTargetPos = lSwivelNewTargetPos;
@@ -106,6 +133,8 @@ void writeStatusMessage() {
   Serial.print(",");
   Serial.print(stepper.currentPosition());
   Serial.print(",");
+  Serial.print(lSwivelTargetPos);
+  Serial.print(",");
   Serial.print(bHasCommand);
   Serial.print(",");
   Serial.print(isReady);
@@ -123,12 +152,12 @@ void setup() {
   pinMode(SWIVEL_STEP_ENABLE, OUTPUT);
   digitalWrite(SWIVEL_STEP_ENABLE, HIGH);
   
-  // Set to use full microstepping
+  // Set microstepping
   pinMode(SWIVEL_MICROSTEP_PIN_1, OUTPUT);
   pinMode(SWIVEL_MICROSTEP_PIN_2, OUTPUT);
   pinMode(SWIVEL_MICROSTEP_PIN_3, OUTPUT);
-  digitalWrite(SWIVEL_MICROSTEP_PIN_1, HIGH);
-  digitalWrite(SWIVEL_MICROSTEP_PIN_2, HIGH);
+  digitalWrite(SWIVEL_MICROSTEP_PIN_1, LOW);
+  digitalWrite(SWIVEL_MICROSTEP_PIN_2, LOW);
   digitalWrite(SWIVEL_MICROSTEP_PIN_3, HIGH);
   
   // Stepper limit switches
@@ -146,6 +175,9 @@ void setup() {
   // Start calibration mode
   iSwivelState = SWIVEL_CALIBRATE_BOUNDS_LOW;
 
+  // Set launcher extend duration to default
+  lLauncherExtendDuration = LAUNCHER_EXTEND_DURATION;
+
   // Start serial
   Serial.begin(115200);
 }
@@ -162,6 +194,90 @@ void loop() {
     return;
   }
 
+  // Check limit switches
+  bool limitLow = !digitalRead(SWIVEL_LIMIT_LOW_PIN);
+  bool limitHigh = !digitalRead(SWIVEL_LIMIT_HIGH_PIN);
+
+  // Check ball detector
+  // Latch so once it's on, needs to be reset manually
+  bHasBall = !digitalRead(BALL_DETECTOR_PIN) || bHasBallLatch;
+
+  // Read in command buffer
+  while (Serial.available()) {
+    int inputChar = Serial.read();
+    if (inputChar == '\n') {
+      // Newline; parse command and execute, clear buffer
+      cBytesRead += 1;
+      cSerialBuffer[cBytesRead] = '\n';
+      Serial.write(cSerialBuffer, cBytesRead + 1);
+      cBytesRead = 0;
+  
+      // Split and parse command string
+      String command = cSerialBuffer;
+      command.trim();
+      String commandId = getValue(command,',',0);
+      String commandPayload = getValue(command,',',1);
+      commandId.trim();
+      commandPayload.trim();
+
+      Serial.print("Command:");
+      Serial.println(commandId);
+      Serial.println(commandPayload);
+      if (commandId == "z") {
+        if (commandPayload.equals("stop")) {
+          iSwivelState = SWIVEL_IDLE;
+          Serial.println("Stopping calibration");
+        }
+        if (commandPayload.equals("start")) {
+          iSwivelState = SWIVEL_CALIBRATE_BOUNDS_LOW;
+        }
+        if (commandPayload.equals("limit")) {
+          if (iSwivelState == SWIVEL_CALIBRATE_BOUNDS_LOW) {
+            limitLow = true;
+          } else if (iSwivelState == SWIVEL_CALIBRATE_BOUNDS_HIGH) {
+            limitHigh = true;
+          }
+        }
+      }
+
+      if (commandId == "r") {
+        Serial.println("Resetting");
+        bHasCommand = false;
+        bYawIsReady = false;
+        bWantsLaunch = false;
+        bHasBall = false;
+        bHasBallLatch = false;
+      }
+      
+      if (commandId == "l") {
+        Serial.println("Launching");
+        triggerCommandCallback();
+        if (commandPayload.equals("slow")) {
+          lLauncherExtendDuration = 10000;
+        }
+      }
+
+      if (commandId == "m") {
+        Serial.print("Moving to: ");
+        Serial.println(commandPayload.toInt());
+        yawCommandCallback(commandPayload.toInt());
+      }
+
+      // Clear last command
+      cBytesRead = 0;
+      for (int i = 0; i < 64; i++) {
+        cSerialBuffer[i] = 0;
+      }
+    }
+    else if (cBytesRead < 64) {
+      // Append command to buffer.
+      cSerialBuffer[cBytesRead] = inputChar;
+      cBytesRead++;
+    } else {
+      // Buffer overflowed, ignore packet until we receive a newline.
+    }
+  }
+
   // Write status message at 10Hz
   if (abs(millis() - lLastMessageTimestamp) > 100) {
     writeStatusMessage();
@@ -172,19 +288,6 @@ void loop() {
     bInitiallyConnecting = false;
     bYawIsReady = false;
   }
-
-  // TODO: parse:
-  // yaw command
-  // fire command
-  // reset command
-  
-  // Check limit switches
-  bool limitLow = !digitalRead(SWIVEL_LIMIT_LOW_PIN);
-  bool limitHigh = !digitalRead(SWIVEL_LIMIT_HIGH_PIN);
-
-  // Check ball detector
-  // Latch so once it's on, needs to be reset manually
-  bHasBall = !digitalRead(BALL_DETECTOR_PIN) || bHasBallLatch;
 
   switch (iSwivelState) {
     case SWIVEL_IDLE: {
@@ -256,7 +359,7 @@ void loop() {
     }
     case LAUNCHER_EXTENDING: {
       // Wait while the launcher is extending, then start retraction.
-      if (millis() - lLauncherLastAction > LAUNCHER_EXTEND_DURATION) {
+      if (millis() - lLauncherLastAction > lLauncherExtendDuration) {
         launcherServo.write(LAUNCHER_RETRACTED_POS);
         iLauncherState = LAUNCHER_RETRACTING;
         lLauncherLastAction = millis();
