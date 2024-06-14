@@ -21,7 +21,19 @@ String getValue(String data, char separator, int index)
   return found>index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
 
+float mapFloat(float x, float inMin, float inMax, float outMin, float outMax) {
+  return (x - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
+}
 
+float constrainFloat(float x, float outMin, float outMax) {
+  if (x > outMax) {
+    return outMax;
+  }
+  if (x < outMin) {
+    return outMin;
+  }
+  return x;
+}
 // ---------------------------------------------------
 // CONSTANTS
 
@@ -76,7 +88,7 @@ long lLastMessageTimestamp = 0;
 long lSwivelHighPos = 0;
 long lSwivelNewTargetPos = 0;
 long lSwivelTargetPos = 0;
-long lSwivelLastYawMsg = 0;
+float fSwivelLastYawMsg = 0;
 long lLauncherExtendDuration = LAUNCHER_EXTEND_DURATION;
 bool bSwivelClearedEndStop = false;
 bool bYawIsReady = false;
@@ -100,12 +112,12 @@ void triggerCommandCallback() {
   bWantsLaunch = true;
 }
 
-void yawCommandCallback(int yaw_msg) {
+void yawCommandCallback(float yaw_msg) {
   // Yaw message will be a value from -90 to 90 inclusive
   // Convert this to a target position.
-  lSwivelLastYawMsg = yaw_msg;
-  lSwivelNewTargetPos = constrain(map(-yaw_msg, -45, 45, 0, lSwivelHighPos),0, lSwivelHighPos);
-  
+  lSwivelNewTargetPos = (int)round(constrainFloat(mapFloat(-yaw_msg, -45.0f, 45.0f, 0.0f, (float)lSwivelHighPos),0.0f, (float)lSwivelHighPos));
+  fSwivelLastYawMsg = yaw_msg;
+
   if (lSwivelNewTargetPos != lSwivelTargetPos || bHasCommand == false) {
     lSwivelTargetPos = lSwivelNewTargetPos;
     bYawIsReady = false;
@@ -259,8 +271,8 @@ void loop() {
 
       if (commandId == "m") {
         Serial.print("Moving to: ");
-        Serial.println(commandPayload.toInt());
-        yawCommandCallback(commandPayload.toInt());
+        Serial.println(commandPayload.toFloat());
+        yawCommandCallback(commandPayload.toFloat());
       }
 
       // Clear last command
