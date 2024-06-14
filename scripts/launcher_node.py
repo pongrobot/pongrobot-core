@@ -116,10 +116,10 @@ class LauncherHandler:
                     self.has_ball_pub.publish(Bool(self.ball_ready_val == 1))
             else:
                 if self.yaw_ready_val != 0:
-                    self.yaw_ready_pub.publish(Bool(self.yaw_ready_val == 1))
+                    self.yaw_ready_pub.publish(Bool(False))
                     self.yaw_ready_val = 0
                 
-                if self.ball_ready_val != 0
+                if self.ball_ready_val != 0:
                     self.has_ball_pub.publish(Bool(False))
                     self.ball_ready_val = 0
     
