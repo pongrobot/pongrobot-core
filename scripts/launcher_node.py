@@ -24,6 +24,7 @@ class LauncherHandler:
 
         self.load_config()
 
+        self.launcher_yaw_offset = 5.0
         self.yaw_ready_val = 0
         self.ball_ready_val = 0
 
@@ -47,7 +48,7 @@ class LauncherHandler:
             self.port.flush()
 
     def yaw_cmd_callback(self, msg):
-        yaw_val = msg.data
+        yaw_val = msg.data - self.launcher_yaw_offset
         rospy.loginfo("Received YAW command: {:.4f} deg".format(yaw_val))
         if self.port_open:
             self.port.write(("m,{}\n".format(yaw_val)).encode(encoding='utf-8'))
