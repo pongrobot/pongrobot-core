@@ -14,13 +14,13 @@ visualization/plot_target: true # enable plotting an rviz marker for the target 
 
 # VESC config values
 vesc/num_motor_poles: 7 # number of motor poles
-vesc/rpm_accel: 800.0 # rpm acceleration limit in rpm/sec
+vesc/rpm_accel: 400.0 # rpm acceleration limit in rpm/sec
 vesc/duty_cycle_accel: 2.0 # duty cycle acceleration limit in %/sec
-vesc/ramp_time: 3.0 # maximum time it take for the vesc to reach a commanded value (sec)
-vesc/cooldown_time: 3.0 # time after a trigger command has been send before the vescs turn off (sec)
-vesc/command_timeout: 3.0  # max time a command will stay active waiting for a trigger signal (sec) 
+vesc/ramp_time: 5.0 # maximum time it take for the vesc to reach a commanded value (sec)
+vesc/cooldown_time: 1.0 # time after a trigger command has been send before the vescs turn off (sec)
+vesc/command_timeout: 10.0  # max time a command will stay active waiting for a trigger signal (sec) 
 vesc/max_rpm: 2500 # max rpm value for the vesc
 vesc/rpm_calibration_slope: 0.95339 # RPM calibration slope from regression analysis
 vesc/rpm_calibration_offset: -0.77448 # RPM calibration offset from regression analysis
-vesc/fudge: 1.0 # fudge factor for motor commands, should be driven to zero with a well calibrated system
+vesc/fudge: 1.02 # fudge factor for motor commands, should be driven to zero with a well calibrated system
 
