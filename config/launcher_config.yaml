@@ -24,3 +24,6 @@ vesc/rpm_calibration_slope: 0.95339 # RPM calibration slope from regression anal
 vesc/rpm_calibration_offset: -0.77448 # RPM calibration offset from regression analysis
 vesc/fudge: 1.02 # fudge factor for motor commands, should be driven to zero with a well calibrated system
 
+# launcher config
+yaw/fudge_offset: 0.0
+yaw/fudge_scalar: 0.0

@@ -48,7 +48,10 @@ class LauncherHandler:
             self.port.flush()
 
     def yaw_cmd_callback(self, msg):
-        yaw_val = msg.data - self.launcher_yaw_offset
+        self.launcher_yaw_offset = rospy.get_param("yaw/fudge_offset")
+        self.launcher_yaw_scalar = rospy.get_param("yaw/fudge_scalar")
+
+        yaw_val = (msg.data * self.launcher_yaw_scalar) + self.launcher_yaw_offset
         rospy.loginfo("Received YAW command: {:.4f} deg".format(yaw_val))
         if self.port_open:
             self.port.write(("m,{}\n".format(yaw_val)).encode(encoding='utf-8'))
