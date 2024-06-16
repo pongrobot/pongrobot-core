@@ -24,7 +24,6 @@ class LauncherHandler:
 
         self.load_config()
 
-        self.launcher_yaw_offset = 5.0
         self.yaw_ready_val = 0
         self.ball_ready_val = 0
 
